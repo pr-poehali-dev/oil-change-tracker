@@ -390,7 +390,7 @@ export default function Index() {
                 <div>
                   <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">До замены</p>
                   <p className="text-xl font-mono font-medium mt-0.5" style={{ color: urgencyColor }}>
-                    {remaining > 0 ? `${remaining.toLocaleString("ru-RU")} км` : "Замените масло!"}
+                    {remaining > 0 ? `${remaining.toLocaleString("ru-RU")} км` : "0 км"}
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: urgencyColor + "20" }}>
@@ -400,6 +400,24 @@ export default function Index() {
                   />
                 </div>
               </div>
+
+              {remaining <= 300 && remaining > 0 && (
+                <div className="w-full mt-4 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3">
+                  <Icon name="AlertCircle" size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-sm font-golos text-amber-800 leading-snug">
+                    Допустимая норма пробега скоро закончится. Замените масло.
+                  </p>
+                </div>
+              )}
+
+              {remaining === 0 && (
+                <div className="w-full mt-4 flex items-start gap-3 bg-red-50 border border-red-400 rounded-2xl px-4 py-3">
+                  <Icon name="AlertTriangle" size={18} className="text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-sm font-golos font-semibold text-red-700 leading-snug">
+                    Эксплуатация ВВСТ невозможна! Замените масло.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Input */}
