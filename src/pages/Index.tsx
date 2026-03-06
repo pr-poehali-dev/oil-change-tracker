@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
@@ -7,13 +8,26 @@ type Car = { id: string; brand: string; model: string; year: string; interval: n
 
 const DEFAULT_INTERVAL = 10000;
 
-function getTodayStr() {
-  return new Date().toISOString().split("T")[0];
+// Ключи localStorage привязаны к carId
+function entriesKey(carId: string) { return `oil_entries_${carId}`; }
+function totalKey(carId: string)   { return `oil_total_${carId}`; }
+
+function loadEntries(carId: string | null): DayEntry[] {
+  if (!carId) return [];
+  try { return JSON.parse(localStorage.getItem(entriesKey(carId)) || "[]"); }
+  catch { return []; }
 }
 
+function loadTotal(carId: string | null): number {
+  if (!carId) return 0;
+  try { return Number(localStorage.getItem(totalKey(carId)) || "0"); }
+  catch { return 0; }
+}
+
+function getTodayStr() { return new Date().toISOString().split("T")[0]; }
+
 function formatDate(str: string) {
-  const d = new Date(str + "T00:00:00");
-  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  return new Date(str + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -21,8 +35,8 @@ function getDaysInMonth(year: number, month: number) {
 }
 
 function getFirstDayOfMonth(year: number, month: number) {
-  const day = new Date(year, month, 1).getDay();
-  return day === 0 ? 6 : day - 1;
+  const d = new Date(year, month, 1).getDay();
+  return d === 0 ? 6 : d - 1;
 }
 
 const MONTH_NAMES = [
@@ -44,14 +58,8 @@ export default function Index() {
   const [tab, setTab] = useState<"counter" | "calendar">("counter");
   const [dailyInput, setDailyInput] = useState("");
   const [activeCar, setActiveCar] = useState<Car | null>(getActiveCar);
-  const [entries, setEntries] = useState<DayEntry[]>(() => {
-    try { return JSON.parse(localStorage.getItem("oil_entries") || "[]"); }
-    catch { return []; }
-  });
-  const [totalKm, setTotalKm] = useState<number>(() => {
-    try { return Number(localStorage.getItem("oil_total") || "0"); }
-    catch { return 0; }
-  });
+  const [entries, setEntries] = useState<DayEntry[]>(() => loadEntries(getActiveCar()?.id ?? null));
+  const [totalKm, setTotalKm] = useState<number>(() => loadTotal(getActiveCar()?.id ?? null));
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [notification, setNotification] = useState<string | null>(null);
@@ -61,16 +69,25 @@ export default function Index() {
   const progress = Math.min(1, totalKm / oilChangeKm);
   const urgency = progress >= 1 ? "danger" : progress >= 0.8 ? "warn" : "ok";
 
+  // Сохраняем данные конкретного авто
   useEffect(() => {
-    localStorage.setItem("oil_entries", JSON.stringify(entries));
-    localStorage.setItem("oil_total", String(totalKm));
-  }, [entries, totalKm]);
+    if (!activeCar) return;
+    localStorage.setItem(entriesKey(activeCar.id), JSON.stringify(entries));
+    localStorage.setItem(totalKey(activeCar.id), String(totalKm));
+  }, [entries, totalKm, activeCar]);
+
+  // При возврате на страницу перечитываем активное авто и его данные
+  const refreshCar = useCallback(() => {
+    const car = getActiveCar();
+    setActiveCar(car);
+    setEntries(loadEntries(car?.id ?? null));
+    setTotalKm(loadTotal(car?.id ?? null));
+  }, []);
 
   useEffect(() => {
-    const onFocus = () => setActiveCar(getActiveCar());
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
+    window.addEventListener("focus", refreshCar);
+    return () => window.removeEventListener("focus", refreshCar);
+  }, [refreshCar]);
 
   function showNotif(msg: string) {
     setNotification(msg);
@@ -82,12 +99,9 @@ export default function Index() {
     if (!val || val <= 0) return;
     const today = getTodayStr();
     const existing = entries.find((e) => e.date === today);
-    let newEntries: DayEntry[];
-    if (existing) {
-      newEntries = entries.map((e) => e.date === today ? { ...e, km: e.km + val } : e);
-    } else {
-      newEntries = [...entries, { date: today, km: val }];
-    }
+    const newEntries = existing
+      ? entries.map((e) => e.date === today ? { ...e, km: e.km + val } : e)
+      : [...entries, { date: today, km: val }];
     const newTotal = totalKm + val;
     setEntries(newEntries);
     setTotalKm(newTotal);
@@ -128,7 +142,6 @@ export default function Index() {
         <button
           onClick={() => navigate("/car")}
           className="mt-1 w-9 h-9 rounded-xl bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
-          title="Выбрать автомобиль"
         >
           <Icon name="Car" size={16} />
         </button>
@@ -164,9 +177,7 @@ export default function Index() {
               <Icon name="Car" size={15} className="text-muted-foreground" />
               <span className="font-golos text-sm text-muted-foreground">Автомобиль не выбран</span>
             </div>
-            <span className="font-golos text-xs text-muted-foreground underline underline-offset-2">
-              Добавить
-            </span>
+            <span className="font-golos text-xs text-muted-foreground underline underline-offset-2">Добавить</span>
           </div>
         )}
       </div>
@@ -179,9 +190,7 @@ export default function Index() {
               key={t}
               onClick={() => setTab(t)}
               className={`flex-1 py-2 rounded-lg text-sm font-golos font-medium transition-all duration-200 ${
-                tab === t
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t === "counter" ? "Счётчик" : "Календарь"}
@@ -209,13 +218,9 @@ export default function Index() {
                 <svg width="128" height="128" viewBox="0 0 128 128" className="absolute inset-0">
                   <circle cx="64" cy="64" r="54" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
                   <circle
-                    cx="64" cy="64" r="54"
-                    fill="none"
-                    stroke={urgencyColor}
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={dash}
+                    cx="64" cy="64" r="54" fill="none"
+                    stroke={urgencyColor} strokeWidth="10" strokeLinecap="round"
+                    strokeDasharray={circumference} strokeDashoffset={dash}
                     transform="rotate(-90 64 64)"
                     style={{ transition: "stroke-dashoffset 0.6s ease, stroke 0.4s ease" }}
                   />
@@ -232,46 +237,48 @@ export default function Index() {
 
               <div className="w-full border-t border-border pt-5 mt-5 flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
-                    До замены
-                  </p>
+                  <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">До замены</p>
                   <p className="text-xl font-mono font-medium mt-0.5" style={{ color: urgencyColor }}>
                     {remaining > 0 ? `${remaining.toLocaleString("ru-RU")} км` : "Замените масло!"}
                   </p>
                 </div>
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                  style={{ background: urgencyColor + "20" }}
-                >
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: urgencyColor + "20" }}>
                   <Icon
                     name={urgency === "danger" ? "AlertTriangle" : urgency === "warn" ? "AlertCircle" : "CheckCircle2"}
-                    size={20}
-                    style={{ color: urgencyColor }}
+                    size={20} style={{ color: urgencyColor }}
                   />
                 </div>
               </div>
             </div>
 
+            {/* No car selected */}
+            {!activeCar && (
+              <div className="bg-card border border-dashed border-border rounded-2xl px-5 py-4 flex items-center gap-3">
+                <Icon name="Info" size={15} className="text-muted-foreground shrink-0" />
+                <p className="text-sm text-muted-foreground font-golos">
+                  Выберите автомобиль, чтобы вести отдельный счётчик
+                </p>
+              </div>
+            )}
+
             {/* Input */}
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
-              <p className="text-sm font-golos font-semibold text-foreground">
-                Пробег за сегодня
-              </p>
+              <p className="text-sm font-golos font-semibold text-foreground">Пробег за сегодня</p>
               <div className="flex gap-2 items-center">
                 <input
-                  type="number"
-                  min="0"
-                  step="0.1"
+                  type="number" min="0" step="0.1"
                   value={dailyInput}
                   onChange={(e) => setDailyInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddKm()}
                   placeholder="0"
-                  className="flex-1 bg-secondary rounded-xl px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
+                  disabled={!activeCar}
+                  className="flex-1 bg-secondary rounded-xl px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors disabled:opacity-40"
                 />
                 <span className="text-sm text-muted-foreground font-mono">км</span>
                 <button
                   onClick={handleAddKm}
-                  className="bg-foreground text-background rounded-xl px-5 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all"
+                  disabled={!activeCar}
+                  className="bg-foreground text-background rounded-xl px-5 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Добавить
                 </button>
@@ -279,12 +286,14 @@ export default function Index() {
             </div>
 
             {/* Reset */}
-            <button
-              onClick={handleReset}
-              className="w-full text-center text-sm text-muted-foreground hover:text-destructive transition-colors py-2 font-golos"
-            >
-              Сбросить счётчик после замены масла
-            </button>
+            {activeCar && (
+              <button
+                onClick={handleReset}
+                className="w-full text-center text-sm text-muted-foreground hover:text-destructive transition-colors py-2 font-golos"
+              >
+                Сбросить счётчик после замены масла
+              </button>
+            )}
           </div>
         )}
 
@@ -293,10 +302,7 @@ export default function Index() {
             <div className="bg-card rounded-2xl border border-border p-5">
               <div className="flex items-center justify-between mb-5">
                 <button
-                  onClick={() => {
-                    if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); }
-                    else setCalMonth(calMonth - 1);
-                  }}
+                  onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }}
                   className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
                 >
                   <Icon name="ChevronLeft" size={16} />
@@ -305,10 +311,7 @@ export default function Index() {
                   {MONTH_NAMES[calMonth]} {calYear}
                 </p>
                 <button
-                  onClick={() => {
-                    if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); }
-                    else setCalMonth(calMonth + 1);
-                  }}
+                  onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }}
                   className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
                 >
                   <Icon name="ChevronRight" size={16} />
@@ -317,9 +320,7 @@ export default function Index() {
 
               <div className="grid grid-cols-7 mb-1">
                 {["Пн","Вт","Ср","Чт","Пт","Сб","Вс"].map((d) => (
-                  <div key={d} className="text-center text-xs font-mono text-muted-foreground py-1">
-                    {d}
-                  </div>
+                  <div key={d} className="text-center text-xs font-mono text-muted-foreground py-1">{d}</div>
                 ))}
               </div>
 
@@ -330,17 +331,16 @@ export default function Index() {
                   const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                   const km = entryMap[dateStr];
                   const isToday = dateStr === getTodayStr();
-                  const hasEntry = km !== undefined;
                   return (
                     <div key={day} className="flex flex-col items-center py-0.5">
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-mono transition-all ${
                         isToday ? "bg-foreground text-background font-semibold"
-                        : hasEntry ? "bg-accent/15 text-foreground"
+                        : km !== undefined ? "bg-accent/15 text-foreground"
                         : "text-foreground/70"
                       }`}>
                         {day}
                       </div>
-                      {hasEntry && (
+                      {km !== undefined && (
                         <span className="text-[9px] font-mono text-muted-foreground mt-0.5 leading-none">{km}</span>
                       )}
                     </div>
@@ -374,7 +374,11 @@ export default function Index() {
               </div>
             ) : (
               <div className="text-center py-10 text-muted-foreground text-sm font-golos">
-                Пока нет записей.<br />Добавьте первый пробег в счётчике.
+                {activeCar ? (
+                  <>Пока нет записей.<br />Добавьте первый пробег в счётчике.</>
+                ) : (
+                  <>Выберите автомобиль,<br />чтобы увидеть историю пробега.</>
+                )}
               </div>
             )}
           </div>

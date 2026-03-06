@@ -23,6 +23,11 @@ function loadCars(): Car[] {
   catch { return []; }
 }
 
+function getCarTotal(carId: string): number {
+  try { return Number(localStorage.getItem(`oil_total_${carId}`) || "0"); }
+  catch { return 0; }
+}
+
 function saveCars(cars: Car[]) {
   localStorage.setItem("oil_cars", JSON.stringify(cars));
 }
@@ -140,13 +145,33 @@ export default function Car() {
                           className={isActive ? "text-background" : "text-muted-foreground"}
                         />
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <p className="font-golos font-semibold text-foreground text-sm">
                           {car.brand} {car.model}
                         </p>
                         <p className="font-mono text-xs text-muted-foreground">
-                          {car.year} · замена через {car.interval.toLocaleString("ru-RU")} км
+                          {car.year} · интервал {car.interval.toLocaleString("ru-RU")} км
                         </p>
+                        {(() => {
+                          const total = getCarTotal(car.id);
+                          const pct = Math.min(1, total / car.interval);
+                          const color = pct >= 1 ? "#e05a2b" : pct >= 0.8 ? "#c9922a" : "#4a7c59";
+                          return total > 0 ? (
+                            <div className="mt-2 space-y-1">
+                              <div className="h-1.5 bg-secondary rounded-full overflow-hidden w-36">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{ width: `${pct * 100}%`, background: color }}
+                                />
+                              </div>
+                              <p className="font-mono text-[10px]" style={{ color }}>
+                                {total.toLocaleString("ru-RU")} / {car.interval.toLocaleString("ru-RU")} км
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="font-mono text-[10px] text-muted-foreground mt-1">пробег не внесён</p>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
