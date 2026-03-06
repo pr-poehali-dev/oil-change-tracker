@@ -365,8 +365,8 @@ export default function Index() {
           <div className="animate-fade-in space-y-4">
             {/* Ring */}
             <div className="bg-card rounded-3xl p-8 flex flex-col items-center border border-border">
-              <div className="relative w-32 h-32 flex items-center justify-center">
-                <svg width="128" height="128" viewBox="0 0 128 128" className="absolute inset-0">
+              <div className="relative" style={{ width: 128, height: 128 }}>
+                <svg width="128" height="128" viewBox="0 0 128 128" style={{ position: "absolute", top: 0, left: 0 }}>
                   <circle cx="64" cy="64" r="54" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
                   <circle
                     cx="64" cy="64" r="54" fill="none"
@@ -376,7 +376,7 @@ export default function Index() {
                     style={{ transition: "stroke-dashoffset 0.6s ease, stroke 0.4s ease" }}
                   />
                 </svg>
-                <div className="flex flex-col items-center z-10">
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                   <span className="font-mono text-2xl font-medium text-foreground leading-none">
                     {totalKm.toLocaleString("ru-RU")}
                   </span>
