@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
-const OIL_CHANGE_KM = 3000;
-
 type DayEntry = { date: string; km: number };
+type Car = { id: string; brand: string; model: string; year: string; interval: number };
+
+const DEFAULT_INTERVAL = 10000;
 
 function getTodayStr() {
   return new Date().toISOString().split("T")[0];
@@ -28,9 +30,20 @@ const MONTH_NAMES = [
   "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
 ];
 
+function getActiveCar(): Car | null {
+  try {
+    const id = localStorage.getItem("oil_active_car");
+    if (!id) return null;
+    const cars: Car[] = JSON.parse(localStorage.getItem("oil_cars") || "[]");
+    return cars.find((c) => c.id === id) ?? null;
+  } catch { return null; }
+}
+
 export default function Index() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"counter" | "calendar">("counter");
   const [dailyInput, setDailyInput] = useState("");
+  const [activeCar, setActiveCar] = useState<Car | null>(getActiveCar);
   const [entries, setEntries] = useState<DayEntry[]>(() => {
     try { return JSON.parse(localStorage.getItem("oil_entries") || "[]"); }
     catch { return []; }
@@ -43,14 +56,21 @@ export default function Index() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [notification, setNotification] = useState<string | null>(null);
 
-  const remaining = Math.max(0, OIL_CHANGE_KM - totalKm);
-  const progress = Math.min(1, totalKm / OIL_CHANGE_KM);
+  const oilChangeKm = activeCar?.interval ?? DEFAULT_INTERVAL;
+  const remaining = Math.max(0, oilChangeKm - totalKm);
+  const progress = Math.min(1, totalKm / oilChangeKm);
   const urgency = progress >= 1 ? "danger" : progress >= 0.8 ? "warn" : "ok";
 
   useEffect(() => {
     localStorage.setItem("oil_entries", JSON.stringify(entries));
     localStorage.setItem("oil_total", String(totalKm));
   }, [entries, totalKm]);
+
+  useEffect(() => {
+    const onFocus = () => setActiveCar(getActiveCar());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   function showNotif(msg: string) {
     setNotification(msg);
@@ -72,10 +92,10 @@ export default function Index() {
     setEntries(newEntries);
     setTotalKm(newTotal);
     setDailyInput("");
-    if (newTotal >= OIL_CHANGE_KM) {
+    if (newTotal >= oilChangeKm) {
       showNotif("Пора менять масло! Пробег достигнут.");
-    } else if (newTotal >= OIL_CHANGE_KM * 0.8) {
-      showNotif(`Осталось ${Math.round(OIL_CHANGE_KM - newTotal)} км до замены`);
+    } else if (newTotal >= oilChangeKm * 0.8) {
+      showNotif(`Осталось ${Math.round(oilChangeKm - newTotal)} км до замены`);
     }
   }
 
@@ -96,14 +116,60 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="pt-10 pb-6 px-6 max-w-md mx-auto w-full">
-        <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">
-          Контроль автомобиля
-        </p>
-        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">
-          Замена масла
-        </h1>
+      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full flex items-start justify-between">
+        <div>
+          <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">
+            Контроль автомобиля
+          </p>
+          <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">
+            Замена масла
+          </h1>
+        </div>
+        <button
+          onClick={() => navigate("/car")}
+          className="mt-1 w-9 h-9 rounded-xl bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
+          title="Выбрать автомобиль"
+        >
+          <Icon name="Car" size={16} />
+        </button>
       </header>
+
+      {/* Active car banner */}
+      <div className="px-6 max-w-md mx-auto w-full mb-3">
+        {activeCar ? (
+          <div
+            onClick={() => navigate("/car")}
+            className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center justify-between cursor-pointer hover:border-muted-foreground transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <Icon name="Car" size={15} className="text-muted-foreground" />
+              <span className="font-golos text-sm font-medium text-foreground">
+                {activeCar.brand} {activeCar.model}
+              </span>
+              <span className="font-mono text-xs text-muted-foreground">{activeCar.year}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-xs text-muted-foreground">
+                {activeCar.interval.toLocaleString("ru-RU")} км
+              </span>
+              <Icon name="ChevronRight" size={13} className="text-muted-foreground" />
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => navigate("/car")}
+            className="bg-card border border-dashed border-border rounded-2xl px-4 py-3 flex items-center justify-between cursor-pointer hover:border-foreground/30 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <Icon name="Car" size={15} className="text-muted-foreground" />
+              <span className="font-golos text-sm text-muted-foreground">Автомобиль не выбран</span>
+            </div>
+            <span className="font-golos text-xs text-muted-foreground underline underline-offset-2">
+              Добавить
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <div className="px-6 max-w-md mx-auto w-full">
@@ -134,10 +200,10 @@ export default function Index() {
       )}
 
       {/* Content */}
-      <main className="flex-1 px-6 pt-6 pb-10 max-w-md mx-auto w-full">
+      <main className="flex-1 px-6 pt-5 pb-10 max-w-md mx-auto w-full">
         {tab === "counter" && (
           <div className="animate-fade-in space-y-4">
-            {/* Progress Ring Card */}
+            {/* Progress Ring */}
             <div className="bg-card rounded-3xl p-8 flex flex-col items-center border border-border">
               <div className="relative w-32 h-32 flex items-center justify-center">
                 <svg width="128" height="128" viewBox="0 0 128 128" className="absolute inset-0">
@@ -159,7 +225,7 @@ export default function Index() {
                     {totalKm.toLocaleString("ru-RU")}
                   </span>
                   <span className="text-xs font-mono text-muted-foreground mt-1">
-                    из {OIL_CHANGE_KM.toLocaleString("ru-RU")}
+                    из {oilChangeKm.toLocaleString("ru-RU")}
                   </span>
                 </div>
               </div>
@@ -184,17 +250,6 @@ export default function Index() {
                   />
                 </div>
               </div>
-            </div>
-
-            {/* Interval Info */}
-            <div className="bg-card rounded-2xl border border-border px-5 py-4 flex items-center gap-3">
-              <Icon name="Settings2" size={16} className="text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground">
-                Интервал замены:{" "}
-                <span className="font-mono font-medium text-foreground">
-                  {OIL_CHANGE_KM.toLocaleString("ru-RU")} км
-                </span>
-              </p>
             </div>
 
             {/* Input */}
@@ -235,7 +290,6 @@ export default function Index() {
 
         {tab === "calendar" && (
           <div className="animate-fade-in space-y-4">
-            {/* Month nav */}
             <div className="bg-card rounded-2xl border border-border p-5">
               <div className="flex items-center justify-between mb-5">
                 <button
@@ -261,7 +315,6 @@ export default function Index() {
                 </button>
               </div>
 
-              {/* Weekday headers */}
               <div className="grid grid-cols-7 mb-1">
                 {["Пн","Вт","Ср","Чт","Пт","Сб","Вс"].map((d) => (
                   <div key={d} className="text-center text-xs font-mono text-muted-foreground py-1">
@@ -270,11 +323,8 @@ export default function Index() {
                 ))}
               </div>
 
-              {/* Days grid */}
               <div className="grid grid-cols-7 gap-y-1">
-                {Array.from({ length: firstDay }).map((_, i) => (
-                  <div key={`empty-${i}`} />
-                ))}
+                {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                   const day = i + 1;
                   const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -283,21 +333,15 @@ export default function Index() {
                   const hasEntry = km !== undefined;
                   return (
                     <div key={day} className="flex flex-col items-center py-0.5">
-                      <div
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-mono transition-all ${
-                          isToday
-                            ? "bg-foreground text-background font-semibold"
-                            : hasEntry
-                            ? "bg-accent/15 text-foreground"
-                            : "text-foreground/70"
-                        }`}
-                      >
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-mono transition-all ${
+                        isToday ? "bg-foreground text-background font-semibold"
+                        : hasEntry ? "bg-accent/15 text-foreground"
+                        : "text-foreground/70"
+                      }`}>
                         {day}
                       </div>
                       {hasEntry && (
-                        <span className="text-[9px] font-mono text-muted-foreground mt-0.5 leading-none">
-                          {km}
-                        </span>
+                        <span className="text-[9px] font-mono text-muted-foreground mt-0.5 leading-none">{km}</span>
                       )}
                     </div>
                   );
@@ -305,7 +349,6 @@ export default function Index() {
               </div>
             </div>
 
-            {/* Legend */}
             <div className="flex gap-5 px-1">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-md bg-foreground" />
@@ -317,35 +360,21 @@ export default function Index() {
               </div>
             </div>
 
-            {/* Recent entries */}
             {entries.length > 0 ? (
               <div className="bg-card rounded-2xl border border-border p-5">
-                <p className="text-sm font-golos font-semibold text-foreground mb-3">
-                  История пробега
-                </p>
-                <div className="space-y-0">
-                  {[...entries]
-                    .sort((a, b) => b.date.localeCompare(a.date))
-                    .slice(0, 10)
-                    .map((e, idx, arr) => (
-                      <div
-                        key={e.date}
-                        className={`flex justify-between items-center py-2.5 ${idx < arr.length - 1 ? "border-b border-border/50" : ""}`}
-                      >
-                        <span className="text-sm text-foreground/70 font-golos">
-                          {formatDate(e.date)}
-                        </span>
-                        <span className="font-mono text-sm font-medium text-foreground">
-                          +{e.km.toLocaleString("ru-RU")} км
-                        </span>
-                      </div>
-                    ))}
+                <p className="text-sm font-golos font-semibold text-foreground mb-3">История пробега</p>
+                <div>
+                  {[...entries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((e, idx, arr) => (
+                    <div key={e.date} className={`flex justify-between items-center py-2.5 ${idx < arr.length - 1 ? "border-b border-border/50" : ""}`}>
+                      <span className="text-sm text-foreground/70 font-golos">{formatDate(e.date)}</span>
+                      <span className="font-mono text-sm font-medium text-foreground">+{e.km.toLocaleString("ru-RU")} км</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : (
               <div className="text-center py-10 text-muted-foreground text-sm font-golos">
-                Пока нет записей.<br />
-                Добавьте первый пробег в счётчике.
+                Пока нет записей.<br />Добавьте первый пробег в счётчике.
               </div>
             )}
           </div>
