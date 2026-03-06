@@ -2,186 +2,216 @@ import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
 type DayEntry = { date: string; km: number };
+type ManualStep = { step: number; title: string; items: string[]; img?: string; imgCaption?: string; warning?: string };
+type ManualGuide = { id: string; title: string; icon: string; steps: ManualStep[] };
 
 const CAR = { brand: "Toyota", model: "Camry V30", year: "1990" };
 const CAR_ID = "camry_v30_1990";
 const OIL_INTERVAL = 5000;
 
-const MANUAL: { step: number; title: string; items: string[]; warning?: string }[] = [
+// ─── Фото из мануала ──────────────────────────────────────────────
+const IMG_COVER  = "https://cdn.poehali.dev/files/6977bfd9-00ec-4e45-9319-c61c86e2004f.png";
+const IMG_STEP4  = "https://cdn.poehali.dev/files/a66ca15e-b956-4a1f-ab09-cc792ee15ca5.png"; // ёмкость 10 л
+const IMG_STEP5  = "https://cdn.poehali.dev/files/a66ca15e-b956-4a1f-ab09-cc792ee15ca5.png"; // сливная пробка
+const IMG_STEP6  = "https://cdn.poehali.dev/files/a66ca15e-b956-4a1f-ab09-cc792ee15ca5.png"; // стекание масла
+const IMG_STEP7  = "https://cdn.poehali.dev/files/01f5fcb8-6a5c-437d-9f3c-97ca70c047ba.png"; // фильтр
+const IMG_STEP9  = "https://cdn.poehali.dev/files/01f5fcb8-6a5c-437d-9f3c-97ca70c047ba.png"; // новый фильтр
+const IMG_STEP10 = "https://cdn.poehali.dev/files/72ba902e-f228-4d8c-953e-c4c680c2b53a.png"; // заливка масла
+const IMG_STEP11 = "https://cdn.poehali.dev/files/72ba902e-f228-4d8c-953e-c4c680c2b53a.png"; // щуп
+const IMG_STEP13 = "https://cdn.poehali.dev/files/4ac05869-fa60-42af-8b03-c318e14c7094.png"; // уровень после прогрева
+
+const GUIDES: ManualGuide[] = [
   {
-    step: 1,
-    title: "Прогрейте двигатель",
-    items: [
-      "Заведите двигатель и прогрейте до рабочей температуры.",
-      "Достаточно проехать до гаража или другого запланированного места замены масла.",
-    ],
-  },
-  {
-    step: 2,
-    title: "Заглушите и поднимите машину",
-    items: [
-      "Заглушите двигатель и поднимите машину.",
-      "Заедьте на эстакаду (яму) или воспользуйтесь автоподъёмником (не домкратом).",
-      "Меняем масло самотёком через сливное отверстие — нужен доступ снизу.",
-    ],
-    warning: "Замена вакуумными установками через отверстие для щупа — плохой вариант, от него отказываемся.",
-  },
-  {
-    step: 3,
-    title: "Снимите защиту картера",
-    items: [
-      "Снимите защиту картера (если она присутствует).",
-      "На Toyota Camry V30 она обычно крепится болтами на 8 или 10 к подрамнику.",
-    ],
-  },
-  {
-    step: 4,
-    title: "Подготовьте ёмкость для слива",
-    items: [
-      "Подготовьте ёмкость для сбора отработанного масла.",
-      "Хорошо зарекомендовала себя самодельная ёмкость из 10 л канистры с отрезанной стенкой.",
-      "Или используйте специальный поддон на 10 л.",
-    ],
-  },
-  {
-    step: 5,
-    title: "Выкрутите сливную пробку",
-    items: [
-      "Найдите сливное отверстие для моторного масла на дне двигателя.",
-      "Осторожно и не спеша выкрутите пробку гаечным ключом на 17, предварительно подставив поддон.",
-      "Учитывая возраст машины, пробка могла быть заменена на неоригинальную — уточните ключ заранее.",
-    ],
-    warning: "После извлечения пробки масло сразу начнёт интенсивно стекать. Работайте в перчатках — струя может быть горячей.",
-  },
-  {
-    step: 6,
-    title: "Дайте маслу стечь",
-    items: [
-      "Масло выливается быстро, затем поток замедляется до капель.",
-      "Обычно процесс длится около 20 минут — дождитесь полного стекания.",
-      "Многие дополнительно открывают крышку маслозаливной горловины и вытягивают щуп — масло стечёт быстрее.",
-    ],
-    warning: "Не оставляйте щуп открытым надолго — увеличивается риск попадания грязи в мотор.",
-  },
-  {
-    step: 7,
-    title: "Выкрутите масляный фильтр",
-    items: [
-      "Пока вытекает старое масло, выкрутите отработанный масляный фильтр.",
-      "Попробуйте открутить рукой, если не получится — воспользуйтесь ключом со специальной насадкой.",
-    ],
-    warning: "При выкручивании фильтра работайте осторожно — из него может вытечь немного старого масла. Подложите тряпки.",
-  },
-  {
-    step: 8,
-    title: "Установите сливную пробку",
-    items: [
-      "После полного стекания масла протрите сливное отверстие чистой сухой тряпкой.",
-      "Прикрутите пробку (желательно новую) с новой прокладкой.",
-      "Стандартное усилие затяжки: 30–35 Н·м. Не затягивайте сильнее.",
-      "Опционально: залейте 0,5 л нового масла, дайте стечь — смоет тяжёлые отложения со дна.",
-    ],
-  },
-  {
-    step: 9,
-    title: "Установите новый фильтр",
-    items: [
-      "Смажьте новым маслом уплотнительное кольцо, прилегающее к поверхности фильтра.",
-      "Закрутите фильтр рукой с небольшим усилием или затяните динамометрическим ключом с усилием 25 Н·м.",
-    ],
-    warning: "Не нужно заливать масло в фильтр перед установкой — масляный насос самостоятельно прокачает фильтр.",
-  },
-  {
-    step: 10,
-    title: "Залейте новое масло",
-    items: [
-      "Откройте крышку маслозаливной горловины и залейте масло в двигатель.",
-      "Заливайте порциями: сначала 80% от нужного объёма, подождите 2 минуты пока стечёт, затем проверьте уровень.",
-      "Подготовьте широкую воронку — чтобы не проливать мимо горловины.",
-      "Если не знаете подходящий тип масла — учитывайте преобладающий климат и возраст двигателя.",
-    ],
-  },
-  {
-    step: 11,
-    title: "Проверьте уровень по щупу",
-    items: [
-      "Посмотрите на показания уровня щупа и долейте масло до нужной отметки.",
-      "Зона A (верхняя) — не добавляйте масло.",
-      "Зона B (средняя) — масло желательно долить.",
-      "Зона C (нижняя) — масло необходимо долить.",
-      "Доливайте осторожно, в несколько подходов с паузой и проверкой уровня после каждой заливки.",
-    ],
-    warning: "Не допускайте перелива. Перелив выше метки A создаст излишнее давление на сальники. Недолив ниже метки C приведёт к масляному голоданию двигателя.",
-  },
-  {
-    step: 12,
-    title: "Запустите двигатель",
-    items: [
-      "Закройте заливную горловину и запустите двигатель.",
-      "Дайте мотору поработать пару минут — создастся нужное давление и фильтр заполнится маслом.",
-    ],
-    warning: "После запуска на приборке может возникнуть ошибка давления масла в красной индикации — она почти сразу пропадёт, это нормально.",
-  },
-  {
-    step: 13,
-    title: "Проверьте уровень после прогрева",
-    items: [
-      "Заглушите мотор и через 5 минут снова проверьте уровень масла.",
-      "Масляный фильтр забирает 200–250 мл от залитого масла — уровень может немного снизиться.",
-      "Если уровень не соответствует допустимым значениям — долейте необходимое количество.",
-    ],
-  },
-  {
-    step: 14,
-    title: "Проверьте герметичность",
-    items: [
-      "Снова запустите мотор и проверьте отсутствие утечек масла вокруг масляного фильтра и сливной пробки.",
-    ],
-  },
-  {
-    step: 15,
-    title: "Завершение",
-    items: [
-      "Закройте капот и установите на место защиту картера (если она была снята).",
-      "На приборке может остаться напоминание об интервале замены масла — сбросьте его по инструкции из руководства по обслуживанию.",
-      "Сбросьте счётчик замены масла в приложении (кнопка на вкладке «Счётчик»).",
+    id: "oil",
+    title: "Замена масла",
+    icon: "Droplets",
+    steps: [
+      {
+        step: 1,
+        title: "Прогрейте двигатель",
+        items: [
+          "Заведите двигатель и прогрейте до рабочей температуры.",
+          "Достаточно проехать до гаража или другого места замены.",
+        ],
+        img: IMG_COVER,
+        imgCaption: "Прогреть до рабочей температуры",
+      },
+      {
+        step: 2,
+        title: "Заглушите и поднимите машину",
+        items: [
+          "Заглушите двигатель и поднимите машину.",
+          "Заедьте на эстакаду (яму) или воспользуйтесь автоподъёмником — не домкратом.",
+          "Меняем масло самотёком через сливное отверстие — нужен доступ снизу.",
+        ],
+        warning: "Замена вакуумными установками через отверстие для щупа — плохой вариант, от него отказываемся.",
+      },
+      {
+        step: 3,
+        title: "Снимите защиту картера",
+        items: [
+          "Снимите защиту картера (если присутствует).",
+          "На Toyota Camry V30 крепится болтами на 8 или 10 к подрамнику.",
+        ],
+        img: IMG_COVER,
+        imgCaption: "Снять защиту картера",
+      },
+      {
+        step: 4,
+        title: "Подготовьте ёмкость для слива",
+        items: [
+          "Подготовьте ёмкость для сбора отработанного масла.",
+          "Самодельная ёмкость из 10 л канистры с отрезанной стенкой — хороший вариант.",
+          "Или используйте специальный поддон на 10 л.",
+        ],
+        img: IMG_STEP4,
+        imgCaption: "Ёмкость 10 л для слива",
+      },
+      {
+        step: 5,
+        title: "Выкрутите сливную пробку",
+        items: [
+          "Найдите сливное отверстие на дне двигателя.",
+          "Выкрутите пробку ключом на 17, предварительно подставив поддон.",
+          "Учитывая возраст машины, пробка могла быть заменена — уточните ключ заранее.",
+        ],
+        img: IMG_STEP5,
+        imgCaption: "Откручиваем сливную пробку ключом на 17",
+        warning: "После извлечения пробки масло сразу интенсивно потечёт. Работайте в перчатках — струя горячая.",
+      },
+      {
+        step: 6,
+        title: "Дайте маслу стечь",
+        items: [
+          "Масло выливается быстро, затем поток замедляется до капель.",
+          "Обычно процесс длится около 20 минут — дождитесь полного стекания.",
+          "Можно открыть крышку маслозаливной горловины и вытащить щуп — масло стечёт быстрее.",
+        ],
+        img: IMG_STEP6,
+        imgCaption: "Оставьте масло стекать ~20 минут",
+        warning: "Не оставляйте щуп открытым надолго — увеличивается риск попадания грязи в мотор.",
+      },
+      {
+        step: 7,
+        title: "Выкрутите масляный фильтр",
+        items: [
+          "Пока вытекает масло, выкрутите отработанный масляный фильтр.",
+          "Попробуйте открутить рукой, если не получится — используйте ключ со специальной насадкой.",
+        ],
+        img: IMG_STEP7,
+        imgCaption: "Выкрутить отработанный фильтр",
+        warning: "При выкручивании фильтра из него может вытечь немного масла. Подложите тряпки.",
+      },
+      {
+        step: 8,
+        title: "Установите сливную пробку",
+        items: [
+          "После полного стекания протрите отверстие чистой сухой тряпкой.",
+          "Прикрутите пробку (желательно новую) с новой прокладкой.",
+          "Стандартное усилие затяжки: 30–35 Н·м. Не затягивайте сильнее.",
+          "Опционально: залейте 0,5 л нового масла, дайте стечь — смоет тяжёлые отложения.",
+        ],
+      },
+      {
+        step: 9,
+        title: "Установите новый фильтр",
+        items: [
+          "Смажьте новым маслом уплотнительное кольцо фильтра.",
+          "Закрутите рукой с небольшим усилием или динамометрическим ключом на 25 Н·м.",
+        ],
+        img: IMG_STEP9,
+        imgCaption: "Смазать уплотнитель → установить новый фильтр",
+        warning: "Не заливайте масло в фильтр перед установкой — насос сам прокачает его.",
+      },
+      {
+        step: 10,
+        title: "Залейте новое масло",
+        items: [
+          "Откройте крышку маслозаливной горловины.",
+          "Заливайте порциями: сначала 80% объёма, подождите 2 минуты, проверьте уровень.",
+          "Используйте широкую воронку — чтобы не проливать мимо горловины.",
+        ],
+        img: IMG_STEP10,
+        imgCaption: "Залить масло → подождать 2 мин → проверить уровень",
+      },
+      {
+        step: 11,
+        title: "Проверьте уровень по щупу",
+        items: [
+          "Посмотрите на показания уровня и долейте масло до нужной отметки.",
+          "Зона A (верхняя) — не добавляйте масло.",
+          "Зона B (средняя) — желательно долить.",
+          "Зона C (нижняя) — необходимо долить.",
+          "Доливайте в несколько подходов с паузой и проверкой после каждой заливки.",
+        ],
+        img: IMG_STEP11,
+        imgCaption: "Сверить показания уровня щупа",
+        warning: "Перелив выше метки A создаст давление на сальники. Недолив ниже C — масляное голодание двигателя.",
+      },
+      {
+        step: 12,
+        title: "Запустите двигатель",
+        items: [
+          "Закройте заливную горловину и запустите двигатель.",
+          "Дайте мотору поработать 2 минуты — фильтр заполнится маслом.",
+        ],
+        warning: "После запуска на приборке может мигнуть лампа давления масла — это нормально, почти сразу пропадёт.",
+      },
+      {
+        step: 13,
+        title: "Проверьте уровень после прогрева",
+        items: [
+          "Заглушите мотор и через 5 минут снова проверьте уровень масла.",
+          "Фильтр забирает 200–250 мл — уровень может немного снизиться.",
+          "Если нужно — долейте необходимое количество.",
+        ],
+        img: IMG_STEP13,
+        imgCaption: "Заглушить → подождать 5 мин → проверить уровень",
+      },
+      {
+        step: 14,
+        title: "Проверьте герметичность",
+        items: [
+          "Запустите мотор и проверьте, нет ли утечек вокруг фильтра и сливной пробки.",
+        ],
+        img: IMG_STEP13,
+        imgCaption: "Проверить утечки масла",
+      },
+      {
+        step: 15,
+        title: "Завершение",
+        items: [
+          "Закройте капот и установите на место защиту картера.",
+          "Сбросьте напоминание об интервале замены на приборке по руководству.",
+          "Сбросьте счётчик в приложении на вкладке «Счётчик».",
+        ],
+      },
     ],
   },
 ];
 
+// ─── localStorage helpers ─────────────────────────────────────────
 function entriesKey() { return `oil_entries_${CAR_ID}`; }
 function totalKey()   { return `oil_total_${CAR_ID}`; }
-
 function loadEntries(): DayEntry[] {
-  try { return JSON.parse(localStorage.getItem(entriesKey()) || "[]"); }
-  catch { return []; }
+  try { return JSON.parse(localStorage.getItem(entriesKey()) || "[]"); } catch { return []; }
 }
-
 function loadTotal(): number {
-  try { return Number(localStorage.getItem(totalKey()) || "0"); }
-  catch { return 0; }
+  try { return Number(localStorage.getItem(totalKey()) || "0"); } catch { return 0; }
 }
 
+// ─── Date helpers ─────────────────────────────────────────────────
 function getTodayStr() { return new Date().toISOString().split("T")[0]; }
-
 function formatDate(str: string) {
   return new Date(str + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
-
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
+function getDaysInMonth(year: number, month: number) { return new Date(year, month + 1, 0).getDate(); }
 function getFirstDayOfMonth(year: number, month: number) {
-  const d = new Date(year, month, 1).getDay();
-  return d === 0 ? 6 : d - 1;
+  const d = new Date(year, month, 1).getDay(); return d === 0 ? 6 : d - 1;
 }
+const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
-const MONTH_NAMES = [
-  "Январь","Февраль","Март","Апрель","Май","Июнь",
-  "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
-];
-
+// ─── Component ────────────────────────────────────────────────────
 export default function Index() {
   const [tab, setTab] = useState<"counter" | "calendar" | "manual">("counter");
   const [dailyInput, setDailyInput] = useState("");
@@ -190,6 +220,10 @@ export default function Index() {
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [notification, setNotification] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  // Manual navigation
+  const [activeGuide, setActiveGuide] = useState<string | null>(null);
   const [openStep, setOpenStep] = useState<number | null>(null);
 
   const remaining = Math.max(0, OIL_INTERVAL - totalKm);
@@ -228,6 +262,7 @@ export default function Index() {
   function handleReset() {
     setEntries([]);
     setTotalKm(0);
+    setConfirmReset(false);
     showNotif("Счётчик сброшен. Новый отсчёт!");
   }
 
@@ -239,6 +274,8 @@ export default function Index() {
   const firstDay = getFirstDayOfMonth(calYear, calMonth);
   const entryMap = Object.fromEntries(entries.map((e) => [e.date, e.km]));
 
+  const guide = GUIDES.find((g) => g.id === activeGuide) ?? null;
+
   const TABS = [
     { id: "counter", label: "Счётчик" },
     { id: "calendar", label: "Календарь" },
@@ -247,14 +284,11 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+
       {/* Header */}
       <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full">
-        <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">
-          Контроль автомобиля
-        </p>
-        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">
-          Замена масла
-        </h1>
+        <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">Контроль автомобиля</p>
+        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">Замена масла</h1>
       </header>
 
       {/* Car badge */}
@@ -262,14 +296,10 @@ export default function Index() {
         <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Icon name="Car" size={15} className="text-muted-foreground" />
-            <span className="font-golos text-sm font-semibold text-foreground">
-              {CAR.brand} {CAR.model}
-            </span>
+            <span className="font-golos text-sm font-semibold text-foreground">{CAR.brand} {CAR.model}</span>
             <span className="font-mono text-xs text-muted-foreground">{CAR.year}</span>
           </div>
-          <span className="font-mono text-xs text-muted-foreground">
-            интервал {OIL_INTERVAL.toLocaleString("ru-RU")} км
-          </span>
+          <span className="font-mono text-xs text-muted-foreground">интервал {OIL_INTERVAL.toLocaleString("ru-RU")} км</span>
         </div>
       </div>
 
@@ -279,7 +309,7 @@ export default function Index() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => { setTab(t.id); if (t.id !== "manual") { setActiveGuide(null); setOpenStep(null); } }}
               className={`flex-1 py-2 rounded-lg text-sm font-golos font-medium transition-all duration-200 ${
                 tab === t.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
@@ -299,12 +329,41 @@ export default function Index() {
         </div>
       )}
 
-      {/* Content */}
+      {/* Confirm reset dialog */}
+      {confirmReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="bg-card rounded-3xl border border-border p-6 w-full max-w-sm animate-scale-in shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <Icon name="RotateCcw" size={22} className="text-destructive" />
+            </div>
+            <p className="font-golos font-bold text-foreground text-base mb-1">Сбросить счётчик?</p>
+            <p className="text-sm text-muted-foreground font-golos leading-relaxed mb-5">
+              Весь накопленный пробег и история будут удалены. Это действие нельзя отменить.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmReset(false)}
+                className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleReset}
+                className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-golos font-semibold hover:opacity-85 active:scale-95 transition-all"
+              >
+                Сбросить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 px-6 pt-5 pb-10 max-w-md mx-auto w-full">
 
         {/* ── СЧЁТЧИК ── */}
         {tab === "counter" && (
           <div className="animate-fade-in space-y-4">
+            {/* Ring */}
             <div className="bg-card rounded-3xl p-8 flex flex-col items-center border border-border">
               <div className="relative w-32 h-32 flex items-center justify-center">
                 <svg width="128" height="128" viewBox="0 0 128 128" className="absolute inset-0">
@@ -343,6 +402,7 @@ export default function Index() {
               </div>
             </div>
 
+            {/* Input */}
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
               <p className="text-sm font-golos font-semibold text-foreground">Пробег за сегодня</p>
               <div className="flex gap-2 items-center">
@@ -364,10 +424,12 @@ export default function Index() {
               </div>
             </div>
 
+            {/* Reset button — заметная */}
             <button
-              onClick={handleReset}
-              className="w-full text-center text-sm text-muted-foreground hover:text-destructive transition-colors py-2 font-golos"
+              onClick={() => setConfirmReset(true)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-destructive/30 bg-destructive/5 text-destructive text-sm font-golos font-semibold hover:bg-destructive/10 hover:border-destructive/50 active:scale-95 transition-all"
             >
+              <Icon name="RotateCcw" size={15} className="text-destructive" />
               Сбросить счётчик после замены масла
             </button>
           </div>
@@ -392,13 +454,11 @@ export default function Index() {
                   <Icon name="ChevronRight" size={16} />
                 </button>
               </div>
-
               <div className="grid grid-cols-7 mb-1">
                 {["Пн","Вт","Ср","Чт","Пт","Сб","Вс"].map((d) => (
                   <div key={d} className="text-center text-xs font-mono text-muted-foreground py-1">{d}</div>
                 ))}
               </div>
-
               <div className="grid grid-cols-7 gap-y-1">
                 {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
                 {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -412,9 +472,7 @@ export default function Index() {
                         isToday ? "bg-foreground text-background font-semibold"
                         : km !== undefined ? "bg-accent/15 text-foreground"
                         : "text-foreground/70"
-                      }`}>
-                        {day}
-                      </div>
+                      }`}>{day}</div>
                       {km !== undefined && (
                         <span className="text-[9px] font-mono text-muted-foreground mt-0.5 leading-none">{km}</span>
                       )}
@@ -456,32 +514,63 @@ export default function Index() {
         )}
 
         {/* ── МАНУАЛ ── */}
-        {tab === "manual" && (
+        {tab === "manual" && !activeGuide && (
           <div className="animate-fade-in space-y-3">
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider px-1 mb-2">
+              Инструкции для {CAR.brand} {CAR.model}
+            </p>
+            {GUIDES.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => setActiveGuide(g.id)}
+                className="w-full bg-card border border-border rounded-2xl px-5 py-4 flex items-center justify-between hover:border-muted-foreground transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                    <Icon name={g.icon as "Droplets"} size={18} className="text-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-golos font-semibold text-foreground text-sm">{g.title}</p>
+                    <p className="font-mono text-xs text-muted-foreground mt-0.5">{g.steps.length} шагов</p>
+                  </div>
+                </div>
+                <Icon name="ChevronRight" size={16} className="text-muted-foreground shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
 
-            {/* Заголовок */}
+        {/* ── МАНУАЛ: конкретная инструкция ── */}
+        {tab === "manual" && activeGuide && guide && (
+          <div className="animate-fade-in space-y-3">
+            {/* Back + title */}
+            <button
+              onClick={() => { setActiveGuide(null); setOpenStep(null); }}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-golos mb-1"
+            >
+              <Icon name="ChevronLeft" size={15} />
+              Назад к инструкциям
+            </button>
+
+            {/* Cover */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
               <img
-                src="https://cdn.poehali.dev/files/6977bfd9-00ec-4e45-9319-c61c86e2004f.png"
+                src={IMG_COVER}
                 alt="Toyota Camry V30"
                 className="w-full object-cover object-top"
-                style={{ maxHeight: 180 }}
+                style={{ maxHeight: 160 }}
               />
               <div className="px-5 py-4">
-                <p className="font-golos font-bold text-foreground text-base">
-                  Инструкция по замене масла
-                </p>
-                <p className="text-xs font-mono text-muted-foreground mt-1">
-                  Toyota Camry V30 · 1990–1992 · двигатель 3S-FE
-                </p>
+                <p className="font-golos font-bold text-foreground text-base">Инструкция по замене масла</p>
+                <p className="text-xs font-mono text-muted-foreground mt-0.5">Toyota Camry V30 · 1990–1992 · двигатель 3S-FE</p>
                 <p className="text-sm text-muted-foreground font-golos leading-relaxed mt-2">
-                  Перечислим этапы, которые обычно выполняются при нормальной замене масла в ходовых моторах Camry V30.
+                  Пошаговое руководство по замене моторного масла самотёком через сливное отверстие.
                 </p>
               </div>
             </div>
 
-            {/* Шаги */}
-            {MANUAL.map((section) => {
+            {/* Steps */}
+            {guide.steps.map((section) => {
               const isOpen = openStep === section.step;
               return (
                 <div key={section.step} className="bg-card rounded-2xl border border-border overflow-hidden">
@@ -496,22 +585,37 @@ export default function Index() {
                       <span className="font-golos font-semibold text-foreground text-sm text-left">{section.title}</span>
                     </div>
                     <Icon
-                      name="ChevronDown"
-                      size={16}
+                      name="ChevronDown" size={16}
                       className="text-muted-foreground transition-transform duration-200 shrink-0 ml-2"
                       style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
                     />
                   </button>
                   {isOpen && (
-                    <div className="px-5 pb-4 pt-2 border-t border-border/50 space-y-2 animate-fade-in">
+                    <div className="px-5 pb-4 pt-2 border-t border-border/50 space-y-2.5 animate-fade-in">
+                      {/* Image */}
+                      {section.img && (
+                        <div className="rounded-xl overflow-hidden bg-secondary mb-3">
+                          <img
+                            src={section.img}
+                            alt={section.imgCaption ?? section.title}
+                            className="w-full object-cover object-top"
+                            style={{ maxHeight: 180 }}
+                          />
+                          {section.imgCaption && (
+                            <p className="text-xs font-mono text-muted-foreground px-3 py-2">{section.imgCaption}</p>
+                          )}
+                        </div>
+                      )}
+                      {/* Items */}
                       {section.items.map((item, i) => (
                         <div key={i} className="flex items-start gap-2.5">
                           <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0 mt-[7px]" />
                           <p className="text-sm text-foreground/80 font-golos leading-relaxed">{item}</p>
                         </div>
                       ))}
+                      {/* Warning */}
                       {section.warning && (
-                        <div className="mt-3 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                        <div className="mt-1 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                           <Icon name="AlertTriangle" size={14} className="text-amber-600 shrink-0 mt-0.5" />
                           <p className="text-xs text-amber-800 font-golos leading-relaxed">{section.warning}</p>
                         </div>
@@ -531,10 +635,10 @@ export default function Index() {
                   ["Объём", "4,0 л (с заменой фильтра — 4,3 л)"],
                   ["Фильтр", "Toyota 90915-YZZD4 / MANN W67/1"],
                   ["Пробка картера", "Ключ на 17, затяжка 30–35 Н·м"],
-                  ["Фильтр (затяжка)", "25 Н·м динамометрическим ключом"],
+                  ["Фильтр (затяжка)", "25 Н·м"],
                   ["Интервал", "5 000 км или 6 месяцев"],
                 ].map(([key, val]) => (
-                  <div key={key} className="flex justify-between items-start gap-4 border-b border-border/40 pb-2 last:border-0 last:pb-0">
+                  <div key={key} className="flex justify-between items-start gap-4 border-b border-border/40 pb-2.5 last:border-0 last:pb-0">
                     <span className="text-xs font-mono text-muted-foreground shrink-0">{key}</span>
                     <span className="text-xs font-golos text-foreground text-right">{val}</span>
                   </div>
@@ -543,6 +647,7 @@ export default function Index() {
             </div>
           </div>
         )}
+
       </main>
     </div>
   );
