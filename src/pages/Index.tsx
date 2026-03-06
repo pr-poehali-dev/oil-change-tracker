@@ -1,25 +1,75 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
 type DayEntry = { date: string; km: number };
-type Car = { id: string; brand: string; model: string; year: string; interval: number };
 
-const DEFAULT_INTERVAL = 10000;
+const CAR = { brand: "Toyota", model: "Camry V30", year: "1990" };
+const CAR_ID = "camry_v30_1990";
+const OIL_INTERVAL = 5000;
 
-// Ключи localStorage привязаны к carId
-function entriesKey(carId: string) { return `oil_entries_${carId}`; }
-function totalKey(carId: string)   { return `oil_total_${carId}`; }
+const MANUAL = [
+  {
+    step: 1,
+    title: "Подготовка",
+    items: [
+      "Прогрейте двигатель 5–7 минут и заглушите",
+      "Подготовьте ёмкость для слива отработки (мин. 5 л)",
+      "Моторное масло: 10W-30 или 10W-40 (4 л)",
+      "Фильтр масляный: Toyota 90915-YZZD4 или аналог",
+    ],
+  },
+  {
+    step: 2,
+    title: "Слив старого масла",
+    items: [
+      "Снимите защиту картера (если есть)",
+      "Отверните сливную пробку картера (ключ 14 мм) против часовой стрелки",
+      "Дайте маслу полностью стечь — 10–15 минут",
+      "Замените уплотнительное кольцо пробки (при необходимости)",
+    ],
+  },
+  {
+    step: 3,
+    title: "Замена фильтра",
+    items: [
+      "Масляный фильтр расположен с левой стороны двигателя",
+      "Открутите фильтр специальным ключом или вручную",
+      "Смажьте уплотнитель нового фильтра чистым маслом",
+      "Заверните новый фильтр от руки, затем доверните на ¾ оборота",
+    ],
+  },
+  {
+    step: 4,
+    title: "Заливка нового масла",
+    items: [
+      "Заверните сливную пробку картера и затяните (момент ~35 Н·м)",
+      "Залейте масло через маслозаливную горловину (крышка сверху)",
+      "Объём: 4,0 л (с заменой фильтра — 4,3 л)",
+      "Проверьте уровень щупом: отметка MAX или между MIN и MAX",
+    ],
+  },
+  {
+    step: 5,
+    title: "Проверка",
+    items: [
+      "Запустите двигатель на 1–2 минуты, следите за лампой давления масла",
+      "Заглушите и проверьте нет ли течи под фильтром и пробкой",
+      "Через 5 минут ещё раз проверьте уровень щупом",
+      "Сбросьте счётчик замены масла в приложении",
+    ],
+  },
+];
 
-function loadEntries(carId: string | null): DayEntry[] {
-  if (!carId) return [];
-  try { return JSON.parse(localStorage.getItem(entriesKey(carId)) || "[]"); }
+function entriesKey() { return `oil_entries_${CAR_ID}`; }
+function totalKey()   { return `oil_total_${CAR_ID}`; }
+
+function loadEntries(): DayEntry[] {
+  try { return JSON.parse(localStorage.getItem(entriesKey()) || "[]"); }
   catch { return []; }
 }
 
-function loadTotal(carId: string | null): number {
-  if (!carId) return 0;
-  try { return Number(localStorage.getItem(totalKey(carId)) || "0"); }
+function loadTotal(): number {
+  try { return Number(localStorage.getItem(totalKey()) || "0"); }
   catch { return 0; }
 }
 
@@ -43,50 +93,24 @@ const MONTH_NAMES = [
   "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
 ];
 
-function getActiveCar(): Car | null {
-  try {
-    const id = localStorage.getItem("oil_active_car");
-    if (!id) return null;
-    const cars: Car[] = JSON.parse(localStorage.getItem("oil_cars") || "[]");
-    return cars.find((c) => c.id === id) ?? null;
-  } catch { return null; }
-}
-
 export default function Index() {
-  const navigate = useNavigate();
-  const [tab, setTab] = useState<"counter" | "calendar">("counter");
+  const [tab, setTab] = useState<"counter" | "calendar" | "manual">("counter");
   const [dailyInput, setDailyInput] = useState("");
-  const [activeCar, setActiveCar] = useState<Car | null>(getActiveCar);
-  const [entries, setEntries] = useState<DayEntry[]>(() => loadEntries(getActiveCar()?.id ?? null));
-  const [totalKm, setTotalKm] = useState<number>(() => loadTotal(getActiveCar()?.id ?? null));
+  const [entries, setEntries] = useState<DayEntry[]>(loadEntries);
+  const [totalKm, setTotalKm] = useState<number>(loadTotal);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [notification, setNotification] = useState<string | null>(null);
+  const [openStep, setOpenStep] = useState<number | null>(null);
 
-  const oilChangeKm = activeCar?.interval ?? DEFAULT_INTERVAL;
-  const remaining = Math.max(0, oilChangeKm - totalKm);
-  const progress = Math.min(1, totalKm / oilChangeKm);
+  const remaining = Math.max(0, OIL_INTERVAL - totalKm);
+  const progress = Math.min(1, totalKm / OIL_INTERVAL);
   const urgency = progress >= 1 ? "danger" : progress >= 0.8 ? "warn" : "ok";
 
-  // Сохраняем данные конкретного авто
   useEffect(() => {
-    if (!activeCar) return;
-    localStorage.setItem(entriesKey(activeCar.id), JSON.stringify(entries));
-    localStorage.setItem(totalKey(activeCar.id), String(totalKm));
-  }, [entries, totalKm, activeCar]);
-
-  // При возврате на страницу перечитываем активное авто и его данные
-  const refreshCar = useCallback(() => {
-    const car = getActiveCar();
-    setActiveCar(car);
-    setEntries(loadEntries(car?.id ?? null));
-    setTotalKm(loadTotal(car?.id ?? null));
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener("focus", refreshCar);
-    return () => window.removeEventListener("focus", refreshCar);
-  }, [refreshCar]);
+    localStorage.setItem(entriesKey(), JSON.stringify(entries));
+    localStorage.setItem(totalKey(), String(totalKm));
+  }, [entries, totalKm]);
 
   function showNotif(msg: string) {
     setNotification(msg);
@@ -99,16 +123,16 @@ export default function Index() {
     const today = getTodayStr();
     const existing = entries.find((e) => e.date === today);
     const newEntries = existing
-      ? entries.map((e) => e.date === today ? { ...e, km: e.km + val } : e)
+      ? entries.map((e) => e.date === today ? { ...e, km: +(e.km + val).toFixed(1) } : e)
       : [...entries, { date: today, km: val }];
-    const newTotal = totalKm + val;
+    const newTotal = +(totalKm + val).toFixed(1);
     setEntries(newEntries);
     setTotalKm(newTotal);
     setDailyInput("");
-    if (newTotal >= oilChangeKm) {
+    if (newTotal >= OIL_INTERVAL) {
       showNotif("Пора менять масло! Пробег достигнут.");
-    } else if (newTotal >= oilChangeKm * 0.8) {
-      showNotif(`Осталось ${Math.round(oilChangeKm - newTotal)} км до замены`);
+    } else if (newTotal >= OIL_INTERVAL * 0.8) {
+      showNotif(`Осталось ${Math.round(OIL_INTERVAL - newTotal)} км до замены`);
     }
   }
 
@@ -126,73 +150,52 @@ export default function Index() {
   const firstDay = getFirstDayOfMonth(calYear, calMonth);
   const entryMap = Object.fromEntries(entries.map((e) => [e.date, e.km]));
 
+  const TABS = [
+    { id: "counter", label: "Счётчик" },
+    { id: "calendar", label: "Календарь" },
+    { id: "manual", label: "Мануал" },
+  ] as const;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full flex items-start justify-between">
-        <div>
-          <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">
-            Контроль автомобиля
-          </p>
-          <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">
-            Замена масла
-          </h1>
-        </div>
-        <button
-          onClick={() => navigate("/car")}
-          className="mt-1 w-9 h-9 rounded-xl bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
-        >
-          <Icon name="Car" size={16} />
-        </button>
+      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full">
+        <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">
+          Контроль автомобиля
+        </p>
+        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">
+          Замена масла
+        </h1>
       </header>
 
-      {/* Active car banner */}
+      {/* Car badge */}
       <div className="px-6 max-w-md mx-auto w-full mb-3">
-        {activeCar ? (
-          <div
-            onClick={() => navigate("/car")}
-            className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center justify-between cursor-pointer hover:border-muted-foreground transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <Icon name="Car" size={15} className="text-muted-foreground" />
-              <span className="font-golos text-sm font-medium text-foreground">
-                {activeCar.brand} {activeCar.model}
-              </span>
-              <span className="font-mono text-xs text-muted-foreground">{activeCar.year}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs text-muted-foreground">
-                {activeCar.interval.toLocaleString("ru-RU")} км
-              </span>
-              <Icon name="ChevronRight" size={13} className="text-muted-foreground" />
-            </div>
+        <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Icon name="Car" size={15} className="text-muted-foreground" />
+            <span className="font-golos text-sm font-semibold text-foreground">
+              {CAR.brand} {CAR.model}
+            </span>
+            <span className="font-mono text-xs text-muted-foreground">{CAR.year}</span>
           </div>
-        ) : (
-          <div
-            onClick={() => navigate("/car")}
-            className="bg-card border border-dashed border-border rounded-2xl px-4 py-3 flex items-center justify-between cursor-pointer hover:border-foreground/30 transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <Icon name="Car" size={15} className="text-muted-foreground" />
-              <span className="font-golos text-sm text-muted-foreground">Автомобиль не выбран</span>
-            </div>
-            <span className="font-golos text-xs text-muted-foreground underline underline-offset-2">Добавить</span>
-          </div>
-        )}
+          <span className="font-mono text-xs text-muted-foreground">
+            интервал {OIL_INTERVAL.toLocaleString("ru-RU")} км
+          </span>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="px-6 max-w-md mx-auto w-full">
         <div className="flex gap-1 bg-secondary rounded-xl p-1">
-          {(["counter", "calendar"] as const).map((t) => (
+          {TABS.map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={t.id}
+              onClick={() => setTab(t.id)}
               className={`flex-1 py-2 rounded-lg text-sm font-golos font-medium transition-all duration-200 ${
-                tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                tab === t.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "counter" ? "Счётчик" : "Календарь"}
+              {t.label}
             </button>
           ))}
         </div>
@@ -209,9 +212,10 @@ export default function Index() {
 
       {/* Content */}
       <main className="flex-1 px-6 pt-5 pb-10 max-w-md mx-auto w-full">
+
+        {/* ── СЧЁТЧИК ── */}
         {tab === "counter" && (
           <div className="animate-fade-in space-y-4">
-            {/* Progress Ring */}
             <div className="bg-card rounded-3xl p-8 flex flex-col items-center border border-border">
               <div className="relative w-32 h-32 flex items-center justify-center">
                 <svg width="128" height="128" viewBox="0 0 128 128" className="absolute inset-0">
@@ -229,7 +233,7 @@ export default function Index() {
                     {totalKm.toLocaleString("ru-RU")}
                   </span>
                   <span className="text-xs font-mono text-muted-foreground mt-1">
-                    из {oilChangeKm.toLocaleString("ru-RU")}
+                    из {OIL_INTERVAL.toLocaleString("ru-RU")}
                   </span>
                 </div>
               </div>
@@ -250,17 +254,6 @@ export default function Index() {
               </div>
             </div>
 
-            {/* No car selected */}
-            {!activeCar && (
-              <div className="bg-card border border-dashed border-border rounded-2xl px-5 py-4 flex items-center gap-3">
-                <Icon name="Info" size={15} className="text-muted-foreground shrink-0" />
-                <p className="text-sm text-muted-foreground font-golos">
-                  Выберите автомобиль, чтобы вести отдельный счётчик
-                </p>
-              </div>
-            )}
-
-            {/* Input */}
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
               <p className="text-sm font-golos font-semibold text-foreground">Пробег за сегодня</p>
               <div className="flex gap-2 items-center">
@@ -270,47 +263,41 @@ export default function Index() {
                   onChange={(e) => setDailyInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddKm()}
                   placeholder="0"
-                  disabled={!activeCar}
-                  className="flex-1 bg-secondary rounded-xl px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors disabled:opacity-40"
+                  className="flex-1 bg-secondary rounded-xl px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
                 />
                 <span className="text-sm text-muted-foreground font-mono">км</span>
                 <button
                   onClick={handleAddKm}
-                  disabled={!activeCar}
-                  className="bg-foreground text-background rounded-xl px-5 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="bg-foreground text-background rounded-xl px-5 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all"
                 >
                   Добавить
                 </button>
               </div>
             </div>
 
-            {/* Reset */}
-            {activeCar && (
-              <button
-                onClick={handleReset}
-                className="w-full text-center text-sm text-muted-foreground hover:text-destructive transition-colors py-2 font-golos"
-              >
-                Сбросить счётчик после замены масла
-              </button>
-            )}
+            <button
+              onClick={handleReset}
+              className="w-full text-center text-sm text-muted-foreground hover:text-destructive transition-colors py-2 font-golos"
+            >
+              Сбросить счётчик после замены масла
+            </button>
           </div>
         )}
 
+        {/* ── КАЛЕНДАРЬ ── */}
         {tab === "calendar" && (
           <div className="animate-fade-in space-y-4">
             <div className="bg-card rounded-2xl border border-border p-5">
               <div className="flex items-center justify-between mb-5">
                 <button
-                  onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }}
+                  onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(calMonth - 1); }}
                   className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
                 >
                   <Icon name="ChevronLeft" size={16} />
                 </button>
-                <p className="font-golos font-semibold text-foreground">
-                  {MONTH_NAMES[calMonth]} {calYear}
-                </p>
+                <p className="font-golos font-semibold text-foreground">{MONTH_NAMES[calMonth]} {calYear}</p>
                 <button
-                  onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }}
+                  onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(calMonth + 1); }}
                   className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
                 >
                   <Icon name="ChevronRight" size={16} />
@@ -373,13 +360,74 @@ export default function Index() {
               </div>
             ) : (
               <div className="text-center py-10 text-muted-foreground text-sm font-golos">
-                {activeCar ? (
-                  <>Пока нет записей.<br />Добавьте первый пробег в счётчике.</>
-                ) : (
-                  <>Выберите автомобиль,<br />чтобы увидеть историю пробега.</>
-                )}
+                Пока нет записей.<br />Добавьте первый пробег в счётчике.
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── МАНУАЛ ── */}
+        {tab === "manual" && (
+          <div className="animate-fade-in space-y-3">
+            <div className="bg-card rounded-2xl border border-border px-5 py-4 flex items-start gap-3">
+              <Icon name="Info" size={15} className="text-muted-foreground shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground font-golos leading-relaxed">
+                Пошаговая инструкция по замене масла для <span className="font-medium text-foreground">Toyota Camry V30 (1990)</span>. Двигатель 3S-FE, объём картера 4,0–4,3 л.
+              </p>
+            </div>
+
+            {MANUAL.map((section) => {
+              const isOpen = openStep === section.step;
+              return (
+                <div key={section.step} className="bg-card rounded-2xl border border-border overflow-hidden">
+                  <button
+                    onClick={() => setOpenStep(isOpen ? null : section.step)}
+                    className="w-full px-5 py-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                        <span className="font-mono text-xs font-medium text-foreground">{section.step}</span>
+                      </div>
+                      <span className="font-golos font-semibold text-foreground text-sm">{section.title}</span>
+                    </div>
+                    <Icon
+                      name="ChevronDown"
+                      size={16}
+                      className="text-muted-foreground transition-transform duration-200"
+                      style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-5 pb-4 pt-1 border-t border-border/50 space-y-2 animate-fade-in">
+                      {section.items.map((item, i) => (
+                        <div key={i} className="flex items-start gap-2.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0 mt-2" />
+                          <p className="text-sm text-foreground/80 font-golos leading-relaxed">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="bg-card rounded-2xl border border-border px-5 py-4">
+              <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Расходники</p>
+              <div className="space-y-2">
+                {[
+                  ["Масло", "10W-30 / 10W-40 минерал или полусинтетика"],
+                  ["Объём", "4,0 л (с фильтром — 4,3 л)"],
+                  ["Фильтр", "Toyota 90915-YZZD4 / MANN W67/1"],
+                  ["Пробка картера", "М14×1,5, момент затяжки 35 Н·м"],
+                  ["Интервал", "5 000 км или 6 месяцев"],
+                ].map(([key, val]) => (
+                  <div key={key} className="flex justify-between items-start gap-4">
+                    <span className="text-xs font-mono text-muted-foreground shrink-0">{key}</span>
+                    <span className="text-xs font-golos text-foreground text-right">{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </main>
