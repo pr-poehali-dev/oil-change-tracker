@@ -2,20 +2,20 @@
 // Работают только в нативном приложении (Android/iOS) после установки пакета
 // В браузере — тихий режим без ошибок
 
+import { LocalNotifications } from '@capacitor/local-notifications';
+
 const NOTIF_ID_BASE = 1000;
 const NOTIF_COUNT = 48;
 const STORAGE_KEY = "notif_scheduled_total";
 
 const HOUR = 60 * 60 * 1000;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getPlugin(): any | null {
+function isNative(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cap = (window as any)?.Capacitor;
-    return cap?.Plugins?.LocalNotifications ?? null;
+    return !!(window as any)?.Capacitor?.isNativePlatform?.();
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -37,33 +37,40 @@ function getOverdueMessages(carName: string) {
 }
 
 export async function scheduleOilNotifications(remaining: number, carName: string) {
-  const ln = getPlugin();
-  if (!ln) return;
+  if (!isNative()) return;
 
-  // Если больше 300 км — уведомлений нет
   if (remaining > 300) {
     await cancelOilNotifications();
     return;
   }
 
   try {
-    const { display } = await ln.requestPermissions();
+    const { display } = await LocalNotifications.requestPermissions();
     if (display !== "granted") return;
 
-    await ln.cancel({ notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i })) });
+    await LocalNotifications.cancel({
+      notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i }))
+    });
+
+    await LocalNotifications.createChannel({
+      id: "oil_reminder",
+      name: "Напоминания о замене масла",
+      importance: 4,
+      vibration: true,
+    });
 
     const isOverdue = remaining <= 0;
     const intervalMs = isOverdue ? 1 * HOUR : 2 * HOUR;
     const msgs = isOverdue ? getOverdueMessages(carName) : getWarningMessages(remaining, carName);
 
     const notifications = [];
-    // Первое уведомление — сразу (через 5 сек чтобы успело сохраниться)
-    const firstMsg = msgs[0];
+
+    // Первое уведомление — сразу (через 3 сек)
     notifications.push({
       id: NOTIF_ID_BASE,
-      title: firstMsg.title,
-      body: firstMsg.body,
-      schedule: { at: new Date(Date.now() + 5000) },
+      title: msgs[0].title,
+      body: msgs[0].body,
+      schedule: { at: new Date(Date.now() + 3000) },
       smallIcon: "ic_stat_oil",
       channelId: "oil_reminder",
     });
@@ -83,7 +90,7 @@ export async function scheduleOilNotifications(remaining: number, carName: strin
       });
     }
 
-    await ln.schedule({ notifications });
+    await LocalNotifications.schedule({ notifications });
     localStorage.setItem(STORAGE_KEY, String(remaining));
   } catch {
     //
@@ -91,10 +98,11 @@ export async function scheduleOilNotifications(remaining: number, carName: strin
 }
 
 export async function cancelOilNotifications() {
-  const ln = getPlugin();
-  if (!ln) return;
+  if (!isNative()) return;
   try {
-    await ln.cancel({ notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i })) });
+    await LocalNotifications.cancel({
+      notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i }))
+    });
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     //
