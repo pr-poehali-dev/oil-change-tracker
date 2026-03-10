@@ -1,0 +1,104 @@
+import { useState } from "react";
+import Icon from "@/components/ui/icon";
+import { CarConfig, generateCarId } from "@/lib/cars";
+
+type Props = {
+  onAdd: (car: CarConfig) => void;
+  onClose: () => void;
+};
+
+export default function AddCarModal({ onAdd, onClose }: Props) {
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [year, setYear] = useState("");
+  const [interval, setInterval] = useState("");
+
+  function handleSubmit() {
+    if (!brand.trim() || !model.trim() || !year.trim() || !interval.trim()) return;
+    const id = generateCarId(brand, model, year);
+    const car: CarConfig = {
+      id,
+      brand: brand.trim(),
+      model: model.trim(),
+      year: year.trim(),
+      oilInterval: Number(interval),
+      guides: [],
+      custom: true,
+    };
+    onAdd(car);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-4 sm:pb-0">
+      <div className="bg-card rounded-3xl border border-border p-6 w-full max-w-sm shadow-xl animate-fade-in">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-secondary flex items-center justify-center">
+              <Icon name="Car" size={18} className="text-foreground" />
+            </div>
+            <p className="font-golos font-bold text-foreground text-base">Новый автомобиль</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-secondary flex items-center justify-center hover:bg-muted transition-colors">
+            <Icon name="X" size={15} className="text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Марка</label>
+            <input
+              value={brand} onChange={(e) => setBrand(e.target.value)}
+              placeholder="Toyota, УАЗ, Lada..."
+              className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-golos text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Модель</label>
+            <input
+              value={model} onChange={(e) => setModel(e.target.value)}
+              placeholder="Camry, Патриот, Веста..."
+              className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-golos text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
+            />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Год</label>
+              <input
+                value={year} onChange={(e) => setYear(e.target.value)}
+                placeholder="2010"
+                type="number" min="1900" max="2099"
+                className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-golos text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Интервал, км</label>
+              <input
+                value={interval} onChange={(e) => setInterval(e.target.value)}
+                placeholder="7500"
+                type="number" min="100"
+                className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-golos text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!brand.trim() || !model.trim() || !year.trim() || !interval.trim()}
+            className="flex-1 py-3 rounded-xl bg-foreground text-background text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+          >
+            Добавить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

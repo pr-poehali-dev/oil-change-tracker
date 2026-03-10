@@ -1,360 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
+import {
+  CarConfig, ManualGuide, IMG_COVER,
+  DEFAULT_CARS, DEFAULT_SPECS,
+  loadCustomCars, saveCustomCars,
+  loadCustomSpecs, saveCustomSpecs,
+} from "@/lib/cars";
+import AddCarModal from "@/components/AddCarModal";
+import AddGuideModal from "@/components/AddGuideModal";
 
 type DayEntry = { date: string; km: number };
-type ManualStep = { step: number; title: string; items: string[]; img?: string; imgCaption?: string; warning?: string };
-type ManualGuide = { id: string; title: string; icon: string; steps: ManualStep[] };
-type CarConfig = {
-  id: string;
-  brand: string;
-  model: string;
-  year: string;
-  oilInterval: number;
-  guides: ManualGuide[];
-};
-
-// ─── Фото (Toyota) ────────────────────────────────────────────────
-const IMG_COVER   = "https://cdn.poehali.dev/files/6977bfd9-00ec-4e45-9319-c61c86e2004f.png";
-const IMG_FILTER  = "https://cdn.poehali.dev/files/01f5fcb8-6a5c-437d-9f3c-97ca70c047ba.png";
-const IMG_POUR    = "https://cdn.poehali.dev/files/72ba902e-f228-4d8c-953e-c4c680c2b53a.png";
-const IMG_LEVEL   = "https://cdn.poehali.dev/files/4ac05869-fa60-42af-8b03-c318e14c7094.png";
-const IMG_DRAIN   = "https://cdn.poehali.dev/files/a66ca15e-b956-4a1f-ab09-cc792ee15ca5.png";
-
-// ─── Конфигурация автомобилей ─────────────────────────────────────
-const CARS: CarConfig[] = [
-  {
-    id: "camry_v30_1990",
-    brand: "Toyota",
-    model: "Camry V30",
-    year: "1990",
-    oilInterval: 5000,
-    guides: [
-      {
-        id: "oil",
-        title: "Замена масла",
-        icon: "Droplets",
-        steps: [
-          {
-            step: 1,
-            title: "Прогрейте двигатель",
-            items: [
-              "Заведите двигатель и прогрейте до рабочей температуры.",
-              "Достаточно проехать до гаража или другого места замены.",
-            ],
-            img: IMG_COVER,
-            imgCaption: "Прогреть до рабочей температуры",
-          },
-          {
-            step: 2,
-            title: "Заглушите и поднимите машину",
-            items: [
-              "Заглушите двигатель и поднимите машину.",
-              "Заедьте на эстакаду (яму) или воспользуйтесь автоподъёмником — не домкратом.",
-              "Меняем масло самотёком через сливное отверстие — нужен доступ снизу.",
-            ],
-            warning: "Замена вакуумными установками через отверстие для щупа — плохой вариант, от него отказываемся.",
-          },
-          {
-            step: 3,
-            title: "Снимите защиту картера",
-            items: [
-              "Снимите защиту картера (если присутствует).",
-              "На Toyota Camry V30 крепится болтами на 8 или 10 к подрамнику.",
-            ],
-            img: IMG_COVER,
-            imgCaption: "Снять защиту картера",
-          },
-          {
-            step: 4,
-            title: "Подготовьте ёмкость для слива",
-            items: [
-              "Подготовьте ёмкость для сбора отработанного масла.",
-              "Самодельная ёмкость из 10 л канистры с отрезанной стенкой — хороший вариант.",
-              "Или используйте специальный поддон на 10 л.",
-            ],
-            img: IMG_DRAIN,
-            imgCaption: "Ёмкость 10 л для слива",
-          },
-          {
-            step: 5,
-            title: "Выкрутите сливную пробку",
-            items: [
-              "Найдите сливное отверстие на дне двигателя.",
-              "Выкрутите пробку ключом на 17, предварительно подставив поддон.",
-              "Учитывая возраст машины, пробка могла быть заменена — уточните ключ заранее.",
-            ],
-            img: IMG_DRAIN,
-            imgCaption: "Откручиваем сливную пробку ключом на 17",
-            warning: "После извлечения пробки масло сразу интенсивно потечёт. Работайте в перчатках — струя горячая.",
-          },
-          {
-            step: 6,
-            title: "Дайте маслу стечь",
-            items: [
-              "Масло выливается быстро, затем поток замедляется до капель.",
-              "Обычно процесс длится около 20 минут — дождитесь полного стекания.",
-              "Можно открыть крышку маслозаливной горловины и вытащить щуп — масло стечёт быстрее.",
-            ],
-            img: IMG_DRAIN,
-            imgCaption: "Оставьте масло стекать ~20 минут",
-            warning: "Не оставляйте щуп открытым надолго — увеличивается риск попадания грязи в мотор.",
-          },
-          {
-            step: 7,
-            title: "Выкрутите масляный фильтр",
-            items: [
-              "Пока вытекает масло, выкрутите отработанный масляный фильтр.",
-              "Попробуйте открутить рукой, если не получится — используйте ключ со специальной насадкой.",
-            ],
-            img: IMG_FILTER,
-            imgCaption: "Выкрутить отработанный фильтр",
-            warning: "При выкручивании фильтра из него может вытечь немного масла. Подложите тряпки.",
-          },
-          {
-            step: 8,
-            title: "Установите сливную пробку",
-            items: [
-              "После полного стекания протрите отверстие чистой сухой тряпкой.",
-              "Прикрутите пробку (желательно новую) с новой прокладкой.",
-              "Стандартное усилие затяжки: 30–35 Н·м. Не затягивайте сильнее.",
-              "Опционально: залейте 0,5 л нового масла, дайте стечь — смоет тяжёлые отложения.",
-            ],
-          },
-          {
-            step: 9,
-            title: "Установите новый фильтр",
-            items: [
-              "Смажьте новым маслом уплотнительное кольцо фильтра.",
-              "Закрутите рукой с небольшим усилием или динамометрическим ключом на 25 Н·м.",
-            ],
-            img: IMG_FILTER,
-            imgCaption: "Смазать уплотнитель → установить новый фильтр",
-            warning: "Не заливайте масло в фильтр перед установкой — насос сам прокачает его.",
-          },
-          {
-            step: 10,
-            title: "Залейте новое масло",
-            items: [
-              "Откройте крышку маслозаливной горловины.",
-              "Заливайте порциями: сначала 80% объёма, подождите 2 минуты, проверьте уровень.",
-              "Используйте широкую воронку — чтобы не проливать мимо горловины.",
-            ],
-            img: IMG_POUR,
-            imgCaption: "Залить масло → подождать 2 мин → проверить уровень",
-          },
-          {
-            step: 11,
-            title: "Проверьте уровень по щупу",
-            items: [
-              "Посмотрите на показания уровня и долейте масло до нужной отметки.",
-              "Зона A (верхняя) — не добавляйте масло.",
-              "Зона B (средняя) — желательно долить.",
-              "Зона C (нижняя) — необходимо долить.",
-              "Доливайте в несколько подходов с паузой и проверкой после каждой заливки.",
-            ],
-            img: IMG_POUR,
-            imgCaption: "Сверить показания уровня щупа",
-            warning: "Перелив выше метки A создаст давление на сальники. Недолив ниже C — масляное голодание двигателя.",
-          },
-          {
-            step: 12,
-            title: "Запустите двигатель",
-            items: [
-              "Закройте заливную горловину и запустите двигатель.",
-              "Дайте мотору поработать 2 минуты — фильтр заполнится маслом.",
-            ],
-            warning: "После запуска на приборке может мигнуть лампа давления масла — это нормально, почти сразу пропадёт.",
-          },
-          {
-            step: 13,
-            title: "Проверьте уровень после прогрева",
-            items: [
-              "Заглушите мотор и через 5 минут снова проверьте уровень масла.",
-              "Фильтр забирает 200–250 мл — уровень может немного снизиться.",
-              "Если нужно — долейте необходимое количество.",
-            ],
-            img: IMG_LEVEL,
-            imgCaption: "Заглушить → подождать 5 мин → проверить уровень",
-          },
-          {
-            step: 14,
-            title: "Проверьте герметичность",
-            items: [
-              "Запустите мотор и проверьте, нет ли утечек вокруг фильтра и сливной пробки.",
-            ],
-            img: IMG_LEVEL,
-            imgCaption: "Проверить утечки масла",
-          },
-          {
-            step: 15,
-            title: "Завершение",
-            items: [
-              "Закройте капот и установите на место защиту картера.",
-              "Сбросьте напоминание об интервале замены на приборке по руководству.",
-              "Сбросьте счётчик в приложении на вкладке «Счётчик».",
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "uaz_396219_2008",
-    brand: "УАЗ",
-    model: "396219",
-    year: "2008",
-    oilInterval: 8000,
-    guides: [
-      {
-        id: "oil",
-        title: "Замена масла",
-        icon: "Droplets",
-        steps: [
-          {
-            step: 1,
-            title: "Прогрейте двигатель",
-            items: [
-              "Запустите двигатель ЗМЗ-409 и прогрейте до рабочей температуры (80–90 °С по указателю).",
-              "Достаточно проехать 5–10 км или прогреть на месте до стабилизации температуры.",
-            ],
-            img: IMG_COVER,
-            imgCaption: "Прогреть до рабочей температуры",
-          },
-          {
-            step: 2,
-            title: "Заглушите и подготовьте машину",
-            items: [
-              "Заглушите двигатель, поставьте авто на ровную горизонтальную поверхность.",
-              "Затяните стояночный тормоз, подложите упоры под колёса.",
-              "Благодаря высокому клиренсу УАЗ — доступ снизу возможен без эстакады, но лучше использовать яму.",
-            ],
-          },
-          {
-            step: 3,
-            title: "Подготовьте ёмкость для слива",
-            items: [
-              "Подготовьте ёмкость объёмом не менее 6 л для сбора отработки.",
-              "Двигатель ЗМЗ-409 вмещает около 5,5 л масла — ёмкость должна быть с запасом.",
-            ],
-            img: IMG_DRAIN,
-            imgCaption: "Ёмкость для слива — не менее 6 л",
-          },
-          {
-            step: 4,
-            title: "Выкрутите сливную пробку",
-            items: [
-              "Сливное отверстие расположено в нижней части масляного картера двигателя.",
-              "Выкрутите пробку ключом на 19, подставив поддон.",
-              "На УАЗах пробка нередко прикипает — при необходимости используйте вороток с удлинителем.",
-            ],
-            img: IMG_DRAIN,
-            imgCaption: "Сливная пробка — ключ на 19",
-            warning: "Масло горячее! Работайте в перчатках. Струя может быть интенсивной сразу после откручивания.",
-          },
-          {
-            step: 5,
-            title: "Дайте маслу стечь",
-            items: [
-              "Дождитесь полного стекания масла — не менее 20–25 минут.",
-              "Для ускорения откройте маслозаливную горловину и снимите щуп.",
-            ],
-            img: IMG_DRAIN,
-            imgCaption: "Подождите полного стекания",
-            warning: "Не оставляйте щуп и горловину открытыми надолго — внутрь может попасть грязь.",
-          },
-          {
-            step: 6,
-            title: "Выкрутите масляный фильтр",
-            items: [
-              "На ЗМЗ-409 полнопоточный масляный фильтр расположен с правой стороны блока цилиндров.",
-              "Открутите фильтр рукой или специальным съёмником.",
-              "Подложите ветошь — из фильтра вытечет остаток масла.",
-            ],
-            img: IMG_FILTER,
-            imgCaption: "Масляный фильтр ЗМЗ-409 — правая сторона блока",
-            warning: "Будьте осторожны — корпус фильтра может быть горячим.",
-          },
-          {
-            step: 7,
-            title: "Установите сливную пробку",
-            items: [
-              "Протрите поверхность картера вокруг сливного отверстия чистой тряпкой.",
-              "Установите новую уплотнительную шайбу на пробку (медную или алюминиевую).",
-              "Затяните пробку ключом на 19 с усилием 38–42 Н·м.",
-            ],
-            warning: "Не перетягивайте — резьба в картере алюминиевая, легко срывается.",
-          },
-          {
-            step: 8,
-            title: "Установите новый фильтр",
-            items: [
-              "Рекомендуемый фильтр: FRAM PH10575 / Mann W811/80 / оригинальный ЗМЗ 406.1012005.",
-              "Нанесите тонкий слой свежего масла на уплотнительное кольцо нового фильтра.",
-              "Закрутите фильтр рукой до упора, затем доверните на 3/4 оборота.",
-            ],
-            img: IMG_FILTER,
-            imgCaption: "Смазать уплотнитель → установить новый фильтр",
-            warning: "Не перетягивайте фильтр инструментом — достаточно усилия рук.",
-          },
-          {
-            step: 9,
-            title: "Залейте новое масло",
-            items: [
-              "Рекомендуемое масло: 5W-40 или 10W-40 полусинтетика / синтетика.",
-              "Объём заправки: 5,0 л (без фильтра) / 5,5 л (с фильтром).",
-              "Заливайте через горловину с воронкой. Начните с 4,5 л, затем проверьте уровень.",
-            ],
-            img: IMG_POUR,
-            imgCaption: "Залить масло — 5W-40 или 10W-40",
-          },
-          {
-            step: 10,
-            title: "Проверьте уровень по щупу",
-            items: [
-              "Щуп расположен с правой стороны двигателя ЗМЗ-409.",
-              "Уровень должен быть между метками MIN и MAX, ближе к MAX.",
-              "Доливайте по 200–300 мл с паузой и повторной проверкой.",
-            ],
-            img: IMG_POUR,
-            imgCaption: "Уровень масла — между MIN и MAX",
-            warning: "Перелив опасен: избыток масла вспенивается и попадает в систему вентиляции картера.",
-          },
-          {
-            step: 11,
-            title: "Запустите двигатель",
-            items: [
-              "Закройте маслозаливную горловину, вставьте щуп.",
-              "Запустите двигатель и дайте поработать 2–3 минуты на холостых оборотах.",
-              "Следите за лампой давления масла — должна погаснуть в течение 3–5 секунд после пуска.",
-            ],
-            warning: "Если лампа давления масла не гаснет спустя 5–7 секунд — немедленно заглушите двигатель и найдите причину.",
-          },
-          {
-            step: 12,
-            title: "Проверьте уровень и герметичность",
-            items: [
-              "Заглушите двигатель, подождите 5 минут.",
-              "Снова проверьте уровень по щупу — при необходимости долейте.",
-              "Осмотрите фильтр и пробку на предмет подтёков.",
-            ],
-            img: IMG_LEVEL,
-            imgCaption: "Проверка герметичности и уровня после прогрева",
-          },
-          {
-            step: 13,
-            title: "Завершение",
-            items: [
-              "Запишите пробег на момент замены — следующая замена через 8 000 км.",
-              "Сбросьте счётчик в приложении на вкладке «Счётчик».",
-              "Утилизируйте отработанное масло на специализированном пункте приёма.",
-            ],
-          },
-        ],
-      },
-    ],
-  },
-];
 
 // ─── localStorage helpers ─────────────────────────────────────────
 function entriesKey(carId: string) { return `oil_entries_${carId}`; }
@@ -368,7 +24,7 @@ function loadTotal(carId: string): number {
   try { return Number(localStorage.getItem(totalKey(carId)) || "0"); } catch { return 0; }
 }
 function loadSelectedCarId(): string {
-  return localStorage.getItem(selectedCarKey()) || CARS[0].id;
+  return localStorage.getItem(selectedCarKey()) || DEFAULT_CARS[0].id;
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────
@@ -382,33 +38,24 @@ function getFirstDayOfMonth(year: number, month: number) {
 }
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
-// ─── UAZ specs for manual ─────────────────────────────────────────
-const CAR_SPECS: Record<string, [string, string][]> = {
-  camry_v30_1990: [
-    ["Масло", "10W-30 / 10W-40 (минерал или полусинтетика)"],
-    ["Объём", "4,0 л (с заменой фильтра — 4,3 л)"],
-    ["Фильтр", "Toyota 90915-YZZD4 / MANN W67/1"],
-    ["Пробка картера", "Ключ на 17, затяжка 30–35 Н·м"],
-    ["Фильтр (затяжка)", "25 Н·м"],
-    ["Интервал", "5 000 км или 6 месяцев"],
-  ],
-  uaz_396219_2008: [
-    ["Масло", "5W-40 / 10W-40 полусинтетика или синтетика"],
-    ["Объём", "5,0 л без фильтра / 5,5 л с фильтром"],
-    ["Фильтр", "FRAM PH10575 / Mann W811/80 / ЗМЗ 406.1012005"],
-    ["Пробка картера", "Ключ на 19, затяжка 38–42 Н·м"],
-    ["Фильтр (затяжка)", "Руками + 3/4 оборота"],
-    ["Интервал", "8 000 км или 12 месяцев"],
-  ],
-};
-
 // ─── Component ────────────────────────────────────────────────────
 export default function Index() {
-  const [selectedCarId, setSelectedCarId] = useState<string>(loadSelectedCarId);
+  const [customCars, setCustomCars] = useState<CarConfig[]>(loadCustomCars);
+  const [customSpecs, setCustomSpecs] = useState<Record<string, [string, string][]>>(loadCustomSpecs);
+  const allCars = [...DEFAULT_CARS, ...customCars];
+
+  const [selectedCarId, setSelectedCarId] = useState<string>(() => {
+    const saved = loadSelectedCarId();
+    return allCars.find((c) => c.id === saved) ? saved : DEFAULT_CARS[0].id;
+  });
+
   const [carDropdownOpen, setCarDropdownOpen] = useState(false);
+  const [showAddCar, setShowAddCar] = useState(false);
+  const [showAddGuide, setShowAddGuide] = useState(false);
+  const [confirmDeleteCar, setConfirmDeleteCar] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const car = CARS.find((c) => c.id === selectedCarId) ?? CARS[0];
+  const car = allCars.find((c) => c.id === selectedCarId) ?? DEFAULT_CARS[0];
   const OIL_INTERVAL = car.oilInterval;
 
   const [tab, setTab] = useState<"counter" | "calendar" | "instructions">("counter");
@@ -442,11 +89,14 @@ export default function Index() {
     localStorage.setItem(totalKey(car.id), String(totalKm));
   }, [entries, totalKm, car.id]);
 
-  // Локальные уведомления — планируем при остатке < 300 км
+  // Сохранение кастомных авто
+  useEffect(() => { saveCustomCars(customCars); }, [customCars]);
+  useEffect(() => { saveCustomSpecs(customSpecs); }, [customSpecs]);
+
+  // Локальные уведомления
   useEffect(() => {
     const carName = `${car.brand} ${car.model}`;
     const prev = getScheduledRemaining();
-    // Перепланируем если остаток изменился или не было запланировано
     if (remaining < 300) {
       if (prev === null || Math.abs(prev - remaining) >= 10) {
         scheduleOilNotifications(Math.round(remaining), carName);
@@ -498,6 +148,40 @@ export default function Index() {
     showNotif("Счётчик сброшен. Новый отсчёт!");
   }
 
+  function handleAddCar(newCar: CarConfig) {
+    setCustomCars((prev) => [...prev, newCar]);
+    setSelectedCarId(newCar.id);
+    showNotif(`${newCar.brand} ${newCar.model} добавлен!`);
+  }
+
+  function handleDeleteCar() {
+    const id = car.id;
+    setCustomCars((prev) => prev.filter((c) => c.id !== id));
+    setCustomSpecs((prev) => { const s = { ...prev }; delete s[id]; return s; });
+    localStorage.removeItem(entriesKey(id));
+    localStorage.removeItem(totalKey(id));
+    setSelectedCarId(DEFAULT_CARS[0].id);
+    setConfirmDeleteCar(false);
+    showNotif("Автомобиль удалён");
+  }
+
+  function handleAddGuide(guide: ManualGuide) {
+    setCustomCars((prev) =>
+      prev.map((c) => c.id === car.id ? { ...c, guides: [...c.guides, guide] } : c)
+    );
+    showNotif("Инструкция добавлена!");
+    setActiveGuide(guide.id);
+  }
+
+  function handleDeleteGuide(guideId: string) {
+    setCustomCars((prev) =>
+      prev.map((c) => c.id === car.id ? { ...c, guides: c.guides.filter((g) => g.id !== guideId) } : c)
+    );
+    setActiveGuide(null);
+    setOpenStep(null);
+    showNotif("Инструкция удалена");
+  }
+
   const circumference = 2 * Math.PI * 54;
   const dash = circumference * (1 - progress);
   const urgencyColor = urgency === "danger" ? "#e05a2b" : urgency === "warn" ? "#c9922a" : "#4a7c59";
@@ -507,7 +191,8 @@ export default function Index() {
   const entryMap = Object.fromEntries(entries.map((e) => [e.date, e.km]));
 
   const guide = car.guides.find((g) => g.id === activeGuide) ?? null;
-  const specs = CAR_SPECS[car.id] ?? [];
+  const allSpecs = { ...DEFAULT_SPECS, ...customSpecs };
+  const specs = allSpecs[car.id] ?? [];
 
   const TABS = [
     { id: "counter", label: "Счётчик" },
@@ -547,11 +232,11 @@ export default function Index() {
 
         {carDropdownOpen && (
           <div className="absolute z-40 mt-1 w-[calc(100%-3rem)] max-w-md bg-card border border-border rounded-2xl shadow-xl overflow-hidden animate-fade-in">
-            {CARS.map((c, idx) => (
+            {allCars.map((c, idx) => (
               <button
                 key={c.id}
                 onClick={() => { setSelectedCarId(c.id); setCarDropdownOpen(false); }}
-                className={`w-full px-4 py-3.5 flex items-center justify-between hover:bg-secondary transition-colors text-left ${idx < CARS.length - 1 ? "border-b border-border/50" : ""}`}
+                className={`w-full px-4 py-3.5 flex items-center justify-between hover:bg-secondary transition-colors text-left border-b border-border/50`}
               >
                 <div className="flex items-center gap-2.5">
                   <Icon name="Car" size={14} className={c.id === selectedCarId ? "text-foreground" : "text-muted-foreground"} />
@@ -559,10 +244,18 @@ export default function Index() {
                     {c.brand} {c.model}
                   </span>
                   <span className="font-mono text-xs text-muted-foreground">{c.year}</span>
+                  {c.custom && <span className="font-mono text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-md">мой</span>}
                 </div>
                 {c.id === selectedCarId && <Icon name="Check" size={14} className="text-foreground shrink-0" />}
               </button>
             ))}
+            <button
+              onClick={() => { setCarDropdownOpen(false); setShowAddCar(true); }}
+              className="w-full px-4 py-3.5 flex items-center gap-2.5 hover:bg-secondary transition-colors text-left"
+            >
+              <Icon name="Plus" size={14} className="text-muted-foreground" />
+              <span className="font-golos text-sm text-muted-foreground">Добавить автомобиль</span>
+            </button>
           </div>
         )}
       </div>
@@ -605,22 +298,35 @@ export default function Index() {
               Весь накопленный пробег и история будут удалены. Это действие нельзя отменить.
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setConfirmReset(false)}
-                className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleReset}
-                className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-golos font-semibold hover:opacity-85 active:scale-95 transition-all"
-              >
-                Сбросить
-              </button>
+              <button onClick={() => setConfirmReset(false)} className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors">Отмена</button>
+              <button onClick={handleReset} className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-golos font-semibold hover:opacity-85 active:scale-95 transition-all">Сбросить</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Confirm delete car */}
+      {confirmDeleteCar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="bg-card rounded-3xl border border-border p-6 w-full max-w-sm shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <Icon name="Trash2" size={22} className="text-destructive" />
+            </div>
+            <p className="font-golos font-bold text-foreground text-base mb-1">Удалить автомобиль?</p>
+            <p className="text-sm text-muted-foreground font-golos leading-relaxed mb-5">
+              «{car.brand} {car.model}» и все его данные будут удалены без возможности восстановления.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteCar(false)} className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors">Отмена</button>
+              <button onClick={handleDeleteCar} className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-golos font-semibold hover:opacity-85 active:scale-95 transition-all">Удалить</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      {showAddCar && <AddCarModal onAdd={handleAddCar} onClose={() => setShowAddCar(false)} />}
+      {showAddGuide && <AddGuideModal onAdd={handleAddGuide} onClose={() => setShowAddGuide(false)} />}
 
       <main className="flex-1 px-6 pt-5 pb-10 max-w-md mx-auto w-full">
 
@@ -640,12 +346,8 @@ export default function Index() {
                   />
                 </svg>
                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                  <span className="font-mono text-2xl font-medium text-foreground leading-none">
-                    {totalKm.toLocaleString("ru-RU")}
-                  </span>
-                  <span className="text-xs font-mono text-muted-foreground mt-1">
-                    из {OIL_INTERVAL.toLocaleString("ru-RU")}
-                  </span>
+                  <span className="font-mono text-2xl font-medium text-foreground leading-none">{totalKm.toLocaleString("ru-RU")}</span>
+                  <span className="text-xs font-mono text-muted-foreground mt-1">из {OIL_INTERVAL.toLocaleString("ru-RU")}</span>
                 </div>
               </div>
 
@@ -657,33 +359,24 @@ export default function Index() {
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: urgencyColor + "20" }}>
-                  <Icon
-                    name={urgency === "danger" ? "AlertTriangle" : urgency === "warn" ? "AlertCircle" : "CheckCircle2"}
-                    size={20} style={{ color: urgencyColor }}
-                  />
+                  <Icon name={urgency === "danger" ? "AlertTriangle" : urgency === "warn" ? "AlertCircle" : "CheckCircle2"} size={20} style={{ color: urgencyColor }} />
                 </div>
               </div>
 
               {remaining <= 300 && remaining > 0 && (
                 <div className="w-full mt-4 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3">
                   <Icon name="AlertCircle" size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-sm font-golos text-amber-800 leading-snug">
-                    Допустимая норма пробега скоро закончится. Замените масло.
-                  </p>
+                  <p className="text-sm font-golos text-amber-800 leading-snug">Допустимая норма пробега скоро закончится. Замените масло.</p>
                 </div>
               )}
-
               {remaining === 0 && (
                 <div className="w-full mt-4 flex items-start gap-3 bg-red-50 border border-red-400 rounded-2xl px-4 py-3">
                   <Icon name="AlertTriangle" size={18} className="text-red-600 shrink-0 mt-0.5" />
-                  <p className="text-sm font-golos font-semibold text-red-700 leading-snug">
-                    Эксплуатация ВВСТ невозможна! Замените масло.
-                  </p>
+                  <p className="text-sm font-golos font-semibold text-red-700 leading-snug">Эксплуатация ВВСТ невозможна! Замените масло.</p>
                 </div>
               )}
             </div>
 
-            {/* Input */}
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
               <p className="text-sm font-golos font-semibold text-foreground">Пробег за сегодня</p>
               <div className="flex gap-2 items-center">
@@ -696,12 +389,7 @@ export default function Index() {
                   className="flex-1 bg-secondary rounded-xl px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
                 />
                 <span className="text-sm text-muted-foreground font-mono">км</span>
-                <button
-                  onClick={handleAddKm}
-                  className="bg-foreground text-background rounded-xl px-5 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all"
-                >
-                  Добавить
-                </button>
+                <button onClick={handleAddKm} className="bg-foreground text-background rounded-xl px-5 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all">Добавить</button>
               </div>
             </div>
 
@@ -712,6 +400,16 @@ export default function Index() {
               <Icon name="RotateCcw" size={15} className="text-destructive" />
               Сбросить счётчик после замены масла
             </button>
+
+            {car.custom && (
+              <button
+                onClick={() => setConfirmDeleteCar(true)}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-border text-muted-foreground text-sm font-golos hover:text-destructive hover:border-destructive/30 active:scale-95 transition-all"
+              >
+                <Icon name="Trash2" size={15} />
+                Удалить этот автомобиль
+              </button>
+            )}
           </div>
         )}
 
@@ -817,27 +515,52 @@ export default function Index() {
                 <Icon name="ChevronRight" size={16} className="text-muted-foreground shrink-0" />
               </button>
             ))}
+
+            {car.guides.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm font-golos">
+                Инструкций пока нет.<br />Добавьте свою ниже.
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowAddGuide(true)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-dashed border-border text-muted-foreground text-sm font-golos hover:text-foreground hover:border-muted-foreground active:scale-95 transition-all"
+            >
+              <Icon name="Plus" size={15} />
+              Добавить инструкцию
+            </button>
           </div>
         )}
 
         {/* ── ИНСТРУКЦИИ: конкретная ── */}
         {tab === "instructions" && activeGuide && guide && (
           <div className="animate-fade-in space-y-3">
-            <button
-              onClick={() => { setActiveGuide(null); setOpenStep(null); }}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-golos mb-1"
-            >
-              <Icon name="ChevronLeft" size={15} />
-              Назад к инструкциям
-            </button>
+            <div className="flex items-center justify-between mb-1">
+              <button
+                onClick={() => { setActiveGuide(null); setOpenStep(null); }}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-golos"
+              >
+                <Icon name="ChevronLeft" size={15} />
+                Назад к инструкциям
+              </button>
+              {guide.id.startsWith("custom_") && (
+                <button
+                  onClick={() => handleDeleteGuide(guide.id)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors font-golos"
+                >
+                  <Icon name="Trash2" size={13} />
+                  Удалить
+                </button>
+              )}
+            </div>
 
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
               <img src={IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-top" style={{ maxHeight: 160 }} />
               <div className="px-5 py-4">
-                <p className="font-golos font-bold text-foreground text-base">Инструкция по замене масла</p>
+                <p className="font-golos font-bold text-foreground text-base">{guide.title}</p>
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}</p>
                 <p className="text-sm text-muted-foreground font-golos leading-relaxed mt-2">
-                  Пошаговое руководство по замене моторного масла самотёком через сливное отверстие.
+                  Пошаговое руководство: {guide.steps.length} шагов.
                 </p>
               </div>
             </div>
@@ -890,18 +613,19 @@ export default function Index() {
               );
             })}
 
-            {/* Расходники */}
-            <div className="bg-card rounded-2xl border border-border px-5 py-4">
-              <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Расходники</p>
-              <div className="space-y-2.5">
-                {specs.map(([key, val]) => (
-                  <div key={key} className="flex justify-between items-start gap-4 border-b border-border/40 pb-2.5 last:border-0 last:pb-0">
-                    <span className="text-xs font-mono text-muted-foreground shrink-0">{key}</span>
-                    <span className="text-xs font-golos text-foreground text-right">{val}</span>
-                  </div>
-                ))}
+            {specs.length > 0 && (
+              <div className="bg-card rounded-2xl border border-border px-5 py-4">
+                <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">Расходники</p>
+                <div className="space-y-2.5">
+                  {specs.map(([key, val]) => (
+                    <div key={key} className="flex justify-between items-start gap-4 border-b border-border/40 pb-2.5 last:border-0 last:pb-0">
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">{key}</span>
+                      <span className="text-xs font-golos text-foreground text-right">{val}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
