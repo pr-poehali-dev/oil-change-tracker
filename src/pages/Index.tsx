@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
-  CarConfig, ManualGuide, IMG_COVER,
+  CarConfig, ManualGuide, IMG_COVER, IMG_COVER_UAZ,
   DEFAULT_CARS, DEFAULT_SPECS,
   loadCustomCars, saveCustomCars,
   loadCustomSpecs, saveCustomSpecs,
@@ -555,7 +555,7 @@ export default function Index() {
             </div>
 
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              {car.brand === "Toyota" && <img src={IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-top" style={{ maxHeight: 160 }} />}
+              {(car.brand === "Toyota" || car.brand === "УАЗ") && <img src={car.brand === "УАЗ" ? IMG_COVER_UAZ : IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-top" style={{ maxHeight: 160 }} />}
               <div className="px-5 py-4">
                 <p className="font-golos font-bold text-foreground text-base">{guide.title}</p>
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}</p>
