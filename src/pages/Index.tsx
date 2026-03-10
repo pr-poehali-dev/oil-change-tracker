@@ -279,7 +279,7 @@ export default function Index() {
 
       {/* Notification */}
       {notification && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
           <div className="bg-foreground text-background text-sm font-golos px-5 py-3 rounded-2xl shadow-lg whitespace-nowrap">
             {notification}
           </div>
