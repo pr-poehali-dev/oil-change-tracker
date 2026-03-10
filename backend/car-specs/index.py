@@ -1,0 +1,124 @@
+import json
+import os
+import urllib.request
+
+def handler(event: dict, context) -> dict:
+    """
+    Получает спецификации автомобиля (масло, фильтр, интервал, инструкция) через OpenAI.
+    Принимает: brand, model, year
+    Возвращает: specs (список пар), oilInterval, guides (шаги замены масла)
+    """
+    cors = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    }
+
+    if event.get('httpMethod') == 'OPTIONS':
+        return {'statusCode': 200, 'headers': cors, 'body': ''}
+
+    body = json.loads(event.get('body') or '{}')
+    brand = body.get('brand', '').strip()
+    model = body.get('model', '').strip()
+    year = body.get('year', '').strip()
+
+    if not brand or not model or not year:
+        return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
+
+    api_key = os.environ.get('OPENAI_API_KEY', '')
+    if not api_key:
+        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'OPENAI_API_KEY не задан'})}
+
+    prompt = f"""Ты автомеханик-эксперт. Для автомобиля {brand} {model} {year} года выдай JSON (только JSON, без markdown):
+{{
+  "specs": [
+    ["Масло", "10W-40 (или конкретная рекомендация)"],
+    ["Объём", "4,5 л (с фильтром)"],
+    ["Фильтр", "Артикул или рекомендация"],
+    ["Пробка картера", "размер ключа и момент затяжки"],
+    ["Интервал", "например 10 000 км или 1 год"]
+  ],
+  "oilInterval": 10000,
+  "guides": [
+    {{
+      "id": "oil",
+      "title": "Замена масла",
+      "icon": "Droplets",
+      "steps": [
+        {{
+          "step": 1,
+          "title": "Подготовка",
+          "items": ["Прогрейте двигатель 5-10 минут", "Подготовьте: масло, новый фильтр, ёмкость для слива, ключи"],
+          "warning": null
+        }},
+        {{
+          "step": 2,
+          "title": "Слив старого масла",
+          "items": ["Поднимите автомобиль на домкрате или заедьте на яму", "Подставьте ёмкость под сливную пробку", "Открутите пробку ключом на [размер]", "Дайте маслу полностью стечь 10-15 минут"],
+          "warning": "Масло горячее! Берегите руки."
+        }},
+        {{
+          "step": 3,
+          "title": "Замена масляного фильтра",
+          "items": ["Открутите старый фильтр (спецключом или руками)", "Смажьте резиновое кольцо нового фильтра свежим маслом", "Закрутите новый фильтр от руки до упора, затем на 3/4 оборота"],
+          "warning": null
+        }},
+        {{
+          "step": 4,
+          "title": "Установка пробки",
+          "items": ["Очистите резьбу пробки и картера", "Закрутите пробку с моментом затяжки [момент]", "Убедитесь что прокладка/шайба на месте"],
+          "warning": null
+        }},
+        {{
+          "step": 5,
+          "title": "Заливка нового масла",
+          "items": ["Откройте крышку маслозаливной горловины сверху", "Залейте рекомендуемое масло: [марка, вязкость]", "Объём: [объём] (не превышайте MAX на щупе)", "Закройте крышку"],
+          "warning": null
+        }},
+        {{
+          "step": 6,
+          "title": "Проверка",
+          "items": ["Заведите двигатель на 1-2 минуты", "Проверьте нет ли подтёков под машиной", "Заглушите, подождите 5 минут", "Проверьте уровень щупом — должно быть между MIN и MAX"],
+          "warning": null
+        }}
+      ]
+    }}
+  ]
+}}
+
+Адаптируй все детали конкретно под {brand} {model} {year}. Укажи реальные артикулы фильтров, правильную вязкость масла для российского климата, реальный объём двигателя и момент затяжки пробки."""
+
+    payload = json.dumps({
+        'model': 'gpt-4o-mini',
+        'messages': [
+            {'role': 'system', 'content': 'Ты отвечаешь только валидным JSON без markdown-обёртки.'},
+            {'role': 'user', 'content': prompt}
+        ],
+        'temperature': 0.2,
+        'max_tokens': 2000,
+    }).encode('utf-8')
+
+    req = urllib.request.Request(
+        'https://api.openai.com/v1/chat/completions',
+        data=payload,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        },
+        method='POST'
+    )
+
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
+
+    content = data['choices'][0]['message']['content'].strip()
+    if content.startswith('```'):
+        content = content.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+
+    result = json.loads(content)
+
+    return {
+        'statusCode': 200,
+        'headers': cors,
+        'body': json.dumps(result, ensure_ascii=False)
+    }

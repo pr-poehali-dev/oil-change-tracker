@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Получение спецификаций Toyota Camry 1990",
+      "method": "POST",
+      "path": "/",
+      "body": { "brand": "Toyota", "model": "Camry V30", "year": "1990" },
+      "expectedStatus": 200,
+      "expectedBody": { "oilInterval": 5000 },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Ошибка без параметров",
+      "method": "POST",
+      "path": "/",
+      "body": {},
+      "expectedStatus": 400,
+      "expectedBody": { "error": "brand, model, year обязательны" },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

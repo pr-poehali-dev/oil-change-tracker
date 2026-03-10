@@ -148,8 +148,11 @@ export default function Index() {
     showNotif("Счётчик сброшен. Новый отсчёт!");
   }
 
-  function handleAddCar(newCar: CarConfig) {
+  function handleAddCar(newCar: CarConfig, specs?: [string, string][]) {
     setCustomCars((prev) => [...prev, newCar]);
+    if (specs?.length) {
+      setCustomSpecs((prev) => ({ ...prev, [newCar.id]: specs }));
+    }
     setSelectedCarId(newCar.id);
     showNotif(`${newCar.brand} ${newCar.model} добавлен!`);
   }

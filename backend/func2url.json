@@ -1,7 +1,7 @@
 {
-  "track-visit": "https://functions.poehali.dev/5735af54-42af-414c-b535-3db85b8ca128",
-  "visit-stats": "https://functions.poehali.dev/ef4e5847-3d83-401b-a3d9-076f1f535206",
-  "compress-images": "https://functions.poehali.dev/e608bb35-ff98-4f66-a955-235b7933fd90",
-  "send-email": "https://functions.poehali.dev/f00b9184-0bbf-492a-b44b-275c00b80abc",
-  "catalog-pdf": "https://functions.poehali.dev/ee18244f-3857-4a95-a6c1-657e2c314d8a"
+  "documents": "https://functions.poehali.dev/96dd8cd4-b1a8-4573-ab07-b45126d11cad",
+  "car-specs": "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23",
+  "orders": "https://functions.poehali.dev/14572cbe-96ce-4453-9949-cc0f9f9fa328",
+  "visit-stats": "https://functions.poehali.dev/7ec49c8e-8838-4d18-a8db-443cc379b0a1",
+  "send-email": "https://functions.poehali.dev/2acba6ef-7955-4cd6-856f-1301e0bcb888"
 }
