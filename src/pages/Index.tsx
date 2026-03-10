@@ -1,28 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
   CarConfig, ManualGuide, IMG_COVER, IMG_COVER_UAZ,
   DEFAULT_CARS, DEFAULT_SPECS,
-  loadCustomCars, saveCustomCars,
-  loadCustomSpecs, saveCustomSpecs,
 } from "@/lib/cars";
+import {
+  apiGetCars, apiCreateCar, apiDeleteCar, apiUpdateCar,
+  apiGetEntries, apiSaveEntry,
+} from "@/api";
 import AddCarModal from "@/components/AddCarModal";
 import AddGuideModal from "@/components/AddGuideModal";
 
 type DayEntry = { date: string; km: number };
 
-// ─── localStorage helpers ─────────────────────────────────────────
-function entriesKey(carId: string) { return `oil_entries_${carId}`; }
-function totalKey(carId: string)   { return `oil_total_${carId}`; }
-function selectedCarKey()          { return "selected_car_id"; }
-
-function loadEntries(carId: string): DayEntry[] {
-  try { return JSON.parse(localStorage.getItem(entriesKey(carId)) || "[]"); } catch { return []; }
-}
-function loadTotal(carId: string): number {
-  try { return Number(localStorage.getItem(totalKey(carId)) || "0"); } catch { return 0; }
-}
+function selectedCarKey() { return "selected_car_id"; }
 function loadSelectedCarId(): string {
   return localStorage.getItem(selectedCarKey()) || DEFAULT_CARS[0].id;
 }
@@ -40,14 +32,12 @@ const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","
 
 // ─── Component ────────────────────────────────────────────────────
 export default function Index() {
-  const [customCars, setCustomCars] = useState<CarConfig[]>(loadCustomCars);
-  const [customSpecs, setCustomSpecs] = useState<Record<string, [string, string][]>>(loadCustomSpecs);
+  const [customCars, setCustomCars] = useState<CarConfig[]>([]);
+  const [customSpecs, setCustomSpecs] = useState<Record<string, [string, string][]>>({});
+  const [carsLoaded, setCarsLoaded] = useState(false);
   const allCars = [...DEFAULT_CARS, ...customCars];
 
-  const [selectedCarId, setSelectedCarId] = useState<string>(() => {
-    const saved = loadSelectedCarId();
-    return allCars.find((c) => c.id === saved) ? saved : DEFAULT_CARS[0].id;
-  });
+  const [selectedCarId, setSelectedCarId] = useState<string>(loadSelectedCarId);
 
   const [carDropdownOpen, setCarDropdownOpen] = useState(false);
   const [showAddCar, setShowAddCar] = useState(false);
@@ -60,8 +50,8 @@ export default function Index() {
 
   const [tab, setTab] = useState<"counter" | "calendar" | "instructions">("counter");
   const [dailyInput, setDailyInput] = useState("");
-  const [entries, setEntries] = useState<DayEntry[]>(() => loadEntries(car.id));
-  const [totalKm, setTotalKm] = useState<number>(() => loadTotal(car.id));
+  const [entries, setEntries] = useState<DayEntry[]>([]);
+  const [totalKm, setTotalKm] = useState<number>(0);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [notification, setNotification] = useState<string | null>(null);
@@ -74,24 +64,50 @@ export default function Index() {
   const progress = Math.min(1, totalKm / OIL_INTERVAL);
   const urgency = progress >= 1 ? "danger" : progress >= 0.8 ? "warn" : "ok";
 
+  // Загрузка кастомных авто из БД
+  useEffect(() => {
+    apiGetCars().then((cars: Array<CarConfig & { specs?: [string,string][] }>) => {
+      setCustomCars(cars.map(({ specs: _specs, ...c }) => c));
+      const specsMap: Record<string, [string,string][]> = {};
+      cars.forEach((c) => { if (c.specs?.length) specsMap[c.id] = c.specs; });
+      setCustomSpecs(specsMap);
+      setCarsLoaded(true);
+    }).catch(() => setCarsLoaded(true));
+  }, []);
+
+  // Загрузка записей пробега при смене авто
+  const loadEntriesForCar = useCallback((carId: string) => {
+    const isDefault = DEFAULT_CARS.some((c) => c.id === carId);
+    if (isDefault) {
+      const saved = localStorage.getItem(`oil_entries_${carId}`);
+      const savedTotal = localStorage.getItem(`oil_total_${carId}`);
+      setEntries(saved ? JSON.parse(saved) : []);
+      setTotalKm(savedTotal ? Number(savedTotal) : 0);
+    } else {
+      apiGetEntries(carId).then((data: DayEntry[]) => {
+        setEntries(data);
+        setTotalKm(data.reduce((s, e) => +(s + e.km).toFixed(1), 0));
+      }).catch(() => { setEntries([]); setTotalKm(0); });
+    }
+  }, []);
+
   // Переключение автомобиля
   useEffect(() => {
     localStorage.setItem(selectedCarKey(), selectedCarId);
-    setEntries(loadEntries(selectedCarId));
-    setTotalKm(loadTotal(selectedCarId));
     setActiveGuide(null);
     setOpenStep(null);
-  }, [selectedCarId]);
+    if (carsLoaded || DEFAULT_CARS.some((c) => c.id === selectedCarId)) {
+      loadEntriesForCar(selectedCarId);
+    }
+  }, [selectedCarId, carsLoaded, loadEntriesForCar]);
 
-  // Сохранение данных
+  // Сохранение km для встроенных авто в localStorage
   useEffect(() => {
-    localStorage.setItem(entriesKey(car.id), JSON.stringify(entries));
-    localStorage.setItem(totalKey(car.id), String(totalKm));
+    if (DEFAULT_CARS.some((c) => c.id === car.id)) {
+      localStorage.setItem(`oil_entries_${car.id}`, JSON.stringify(entries));
+      localStorage.setItem(`oil_total_${car.id}`, String(totalKm));
+    }
   }, [entries, totalKm, car.id]);
-
-  // Сохранение кастомных авто
-  useEffect(() => { saveCustomCars(customCars); }, [customCars]);
-  useEffect(() => { saveCustomSpecs(customSpecs); }, [customSpecs]);
 
   // Локальные уведомления
   useEffect(() => {
@@ -122,18 +138,22 @@ export default function Index() {
     setTimeout(() => setNotification(null), 2800);
   }
 
-  function handleAddKm() {
+  async function handleAddKm() {
     const val = parseFloat(dailyInput.replace(",", "."));
     if (!val || val <= 0) return;
     const today = getTodayStr();
     const existing = entries.find((e) => e.date === today);
+    const newKm = existing ? +(existing.km + val).toFixed(1) : val;
     const newEntries = existing
-      ? entries.map((e) => e.date === today ? { ...e, km: +(e.km + val).toFixed(1) } : e)
+      ? entries.map((e) => e.date === today ? { ...e, km: newKm } : e)
       : [...entries, { date: today, km: val }];
     const newTotal = +(totalKm + val).toFixed(1);
     setEntries(newEntries);
     setTotalKm(newTotal);
     setDailyInput("");
+    if (!DEFAULT_CARS.some((c) => c.id === car.id)) {
+      apiSaveEntry(car.id, today, newKm).catch(() => {});
+    }
     if (newTotal >= OIL_INTERVAL) {
       showNotif("Пора менять масло! Пробег достигнут.");
     } else if (newTotal >= OIL_INTERVAL * 0.8) {
@@ -141,14 +161,20 @@ export default function Index() {
     }
   }
 
-  function handleReset() {
+  async function handleReset() {
+    if (!DEFAULT_CARS.some((c) => c.id === car.id)) {
+      for (const e of entries) {
+        await fetch(`https://functions.poehali.dev/569f47e9-9c87-4e78-aac2-72676d772a07/entries/${car.id}/${e.date}`, { method: "DELETE" }).catch(() => {});
+      }
+    }
     setEntries([]);
     setTotalKm(0);
     setConfirmReset(false);
     showNotif("Счётчик сброшен. Новый отсчёт!");
   }
 
-  function handleAddCar(newCar: CarConfig, specs?: [string, string][]) {
+  async function handleAddCar(newCar: CarConfig, specs?: [string, string][]) {
+    await apiCreateCar({ ...newCar, specs: specs ?? [] });
     setCustomCars((prev) => [...prev, newCar]);
     if (specs?.length) {
       setCustomSpecs((prev) => ({ ...prev, [newCar.id]: specs }));
@@ -157,29 +183,32 @@ export default function Index() {
     showNotif(`${newCar.brand} ${newCar.model} добавлен!`);
   }
 
-  function handleDeleteCar() {
+  async function handleDeleteCar() {
     const id = car.id;
+    await apiDeleteCar(id).catch(() => {});
     setCustomCars((prev) => prev.filter((c) => c.id !== id));
     setCustomSpecs((prev) => { const s = { ...prev }; delete s[id]; return s; });
-    localStorage.removeItem(entriesKey(id));
-    localStorage.removeItem(totalKey(id));
     setSelectedCarId(DEFAULT_CARS[0].id);
     setConfirmDeleteCar(false);
     showNotif("Автомобиль удалён");
   }
 
-  function handleAddGuide(guide: ManualGuide) {
+  async function handleAddGuide(guide: ManualGuide) {
+    const updatedGuides = [...car.guides, guide];
     setCustomCars((prev) =>
-      prev.map((c) => c.id === car.id ? { ...c, guides: [...c.guides, guide] } : c)
+      prev.map((c) => c.id === car.id ? { ...c, guides: updatedGuides } : c)
     );
+    await apiUpdateCar(car.id, { guides: updatedGuides }).catch(() => {});
     showNotif("Инструкция добавлена!");
     setActiveGuide(guide.id);
   }
 
-  function handleDeleteGuide(guideId: string) {
+  async function handleDeleteGuide(guideId: string) {
+    const updatedGuides = car.guides.filter((g) => g.id !== guideId);
     setCustomCars((prev) =>
-      prev.map((c) => c.id === car.id ? { ...c, guides: c.guides.filter((g) => g.id !== guideId) } : c)
+      prev.map((c) => c.id === car.id ? { ...c, guides: updatedGuides } : c)
     );
+    await apiUpdateCar(car.id, { guides: updatedGuides }).catch(() => {});
     setActiveGuide(null);
     setOpenStep(null);
     showNotif("Инструкция удалена");

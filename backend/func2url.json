@@ -1,7 +1,6 @@
 {
+  "cars-api": "https://functions.poehali.dev/569f47e9-9c87-4e78-aac2-72676d772a07",
   "documents": "https://functions.poehali.dev/96dd8cd4-b1a8-4573-ab07-b45126d11cad",
   "car-specs": "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23",
-  "orders": "https://functions.poehali.dev/14572cbe-96ce-4453-9949-cc0f9f9fa328",
-  "visit-stats": "https://functions.poehali.dev/7ec49c8e-8838-4d18-a8db-443cc379b0a1",
-  "send-email": "https://functions.poehali.dev/2acba6ef-7955-4cd6-856f-1301e0bcb888"
+  "orders": "https://functions.poehali.dev/14572cbe-96ce-4453-9949-cc0f9f9fa328"
 }
