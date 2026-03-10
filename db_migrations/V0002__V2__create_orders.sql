@@ -1,0 +1,1 @@
+CREATE TABLE t_p33849287_desinsect_service_ma.orders (id SERIAL PRIMARY KEY, client_id INTEGER, client_name VARCHAR(255) NOT NULL, phone VARCHAR(50), address TEXT, service VARCHAR(255), order_date DATE, order_time TIME, price NUMERIC(12,2) DEFAULT 0, status VARCHAR(20) DEFAULT 'new', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());

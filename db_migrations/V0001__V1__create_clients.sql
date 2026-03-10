@@ -1,0 +1,1 @@
+CREATE TABLE t_p33849287_desinsect_service_ma.clients (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, phone VARCHAR(50), email VARCHAR(255), address TEXT, type VARCHAR(20) DEFAULT 'individual', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
