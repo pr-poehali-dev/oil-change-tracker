@@ -1,10 +1,10 @@
 // Локальные уведомления через Capacitor Local Notifications
-// Работают только в нативном приложении (Android/iOS)
+// Работают только в нативном приложении (Android/iOS) после установки пакета
 // В браузере — тихий режим без ошибок
 
 const NOTIF_ID_BASE = 1000;
-const NOTIF_INTERVAL_HOURS = [2, 2.5, 3]; // случайный интервал между уведомлениями
-const NOTIF_COUNT = 24; // уведомлений на сутки вперёд
+const NOTIF_INTERVAL_HOURS = [2, 2.5, 3];
+const NOTIF_COUNT = 24;
 const STORAGE_KEY = "notif_scheduled_total";
 
 function randomInterval() {
@@ -12,7 +12,7 @@ function randomInterval() {
   return h * 60 * 60 * 1000;
 }
 
-function getMessages(remaining: number, carName: string): { title: string; body: string }[] {
+function getMessages(remaining: number, carName: string) {
   return [
     { title: "Замена масла", body: `До замены осталось ${remaining} км на ${carName}. Не тяни!` },
     { title: "Напоминание о масле", body: `${carName}: осталось ${remaining} км. Запишись на замену.` },
@@ -21,27 +21,37 @@ function getMessages(remaining: number, carName: string): { title: string; body:
   ];
 }
 
+// Возвращает плагин LocalNotifications только в Capacitor-среде (нативное приложение)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPlugin(): any | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cap = (window as any)?.Capacitor;
+    return cap?.Plugins?.LocalNotifications ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function scheduleOilNotifications(remaining: number, carName: string) {
-  // Если остаток >= 300 — отменяем все, не планируем
   if (remaining >= 300) {
     await cancelOilNotifications();
     return;
   }
 
-  try {
-    // Динамический импорт — не ломает браузер если пакет не установлен
-    const { LocalNotifications } = await import("@capacitor/local-notifications");
+  const ln = getPlugin();
+  if (!ln) return;
 
-    const { display } = await LocalNotifications.requestPermissions();
+  try {
+    const { display } = await ln.requestPermissions();
     if (display !== "granted") return;
 
-    await LocalNotifications.cancel({ notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i })) });
+    await ln.cancel({ notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i })) });
 
     const msgs = getMessages(remaining, carName);
-    const now = Date.now();
     const notifications = [];
+    let nextAt = Date.now();
 
-    let nextAt = now;
     for (let i = 0; i < NOTIF_COUNT; i++) {
       nextAt += randomInterval();
       const msg = msgs[i % msgs.length];
@@ -50,28 +60,26 @@ export async function scheduleOilNotifications(remaining: number, carName: strin
         title: msg.title,
         body: msg.body,
         schedule: { at: new Date(nextAt) },
-        sound: undefined,
         smallIcon: "ic_stat_oil",
         channelId: "oil_reminder",
       });
     }
 
-    await LocalNotifications.schedule({ notifications });
+    await ln.schedule({ notifications });
     localStorage.setItem(STORAGE_KEY, String(remaining));
   } catch {
-    // Capacitor не установлен (браузер) — просто ничего не делаем
+    //
   }
 }
 
 export async function cancelOilNotifications() {
+  const ln = getPlugin();
+  if (!ln) return;
   try {
-    const { LocalNotifications } = await import("@capacitor/local-notifications");
-    await LocalNotifications.cancel({
-      notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i })),
-    });
+    await ln.cancel({ notifications: Array.from({ length: NOTIF_COUNT }, (_, i) => ({ id: NOTIF_ID_BASE + i })) });
     localStorage.removeItem(STORAGE_KEY);
   } catch {
-    // браузер — игнорируем
+    //
   }
 }
 
