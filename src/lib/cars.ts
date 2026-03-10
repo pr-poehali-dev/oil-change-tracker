@@ -20,8 +20,8 @@ export type CarConfig = {
 export type CarSpecs = [string, string][];
 
 // ─── Фото ─────────────────────────────────────────────────────────
-export const IMG_COVER  = "https://cdn.poehali.dev/projects/3cdd9cd7-5593-4904-947d-4e73989e29c5/files/638e22b8-d09b-4da6-9457-ed4aa8c6af53.jpg";
-export const IMG_COVER_UAZ = "https://cdn.poehali.dev/projects/3cdd9cd7-5593-4904-947d-4e73989e29c5/files/b7b24083-2dfc42cd-8335-57d5ee1cc91e.jpg";
+export const IMG_COVER  = "https://cdn.poehali.dev/projects/3cdd9cd7-5593-4904-947d-4e73989e29c5/files/aaaa0f47-72dd-4859-a7b8-45cc3b4af00c.jpg";
+export const IMG_COVER_UAZ = "https://cdn.poehali.dev/projects/3cdd9cd7-5593-4904-947d-4e73989e29c5/files/c4967a1c-0a39-4f9b-ad1e-6ea8592517f9.jpg";
 export const IMG_FILTER = "https://cdn.poehali.dev/files/01f5fcb8-6a5c-437d-9f3c-97ca70c047ba.png";
 export const IMG_POUR   = "https://cdn.poehali.dev/files/72ba902e-f228-4d8c-953e-c4c680c2b53a.png";
 export const IMG_LEVEL  = "https://cdn.poehali.dev/files/4ac05869-fa60-42af-8b03-c318e14c7094.png";
