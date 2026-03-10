@@ -555,7 +555,7 @@ export default function Index() {
             </div>
 
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              <img src={IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-top" style={{ maxHeight: 160 }} />
+              {car.brand === "Toyota" && <img src={IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-top" style={{ maxHeight: 160 }} />}
               <div className="px-5 py-4">
                 <p className="font-golos font-bold text-foreground text-base">{guide.title}</p>
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}</p>
