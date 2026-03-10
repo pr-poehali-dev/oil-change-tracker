@@ -26,9 +26,9 @@ def handler(event: dict, context) -> dict:
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
-    api_key = os.environ.get('OPENAI_API_KEY', '')
+    api_key = os.environ.get('DEEPSEEK_API_KEY', '')
     if not api_key:
-        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'OPENAI_API_KEY не задан'})}
+        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'DEEPSEEK_API_KEY не задан'})}
 
     prompt = f"""Ты автомеханик-эксперт. Для автомобиля {brand} {model} {year} года выдай JSON (только JSON, без markdown):
 {{
@@ -90,7 +90,7 @@ def handler(event: dict, context) -> dict:
 Адаптируй все детали конкретно под {brand} {model} {year}. Укажи реальные артикулы фильтров, правильную вязкость масла для российского климата, реальный объём двигателя и момент затяжки пробки."""
 
     payload = json.dumps({
-        'model': 'gpt-4o-mini',
+        'model': 'deepseek-chat',
         'messages': [
             {'role': 'system', 'content': 'Ты отвечаешь только валидным JSON без markdown-обёртки.'},
             {'role': 'user', 'content': prompt}
@@ -100,7 +100,7 @@ def handler(event: dict, context) -> dict:
     }).encode('utf-8')
 
     req = urllib.request.Request(
-        'https://api.openai.com/v1/chat/completions',
+        'https://api.deepseek.com/chat/completions',
         data=payload,
         headers={
             'Authorization': f'Bearer {api_key}',
