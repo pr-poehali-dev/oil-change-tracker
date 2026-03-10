@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "Generate PDF with vacancies",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "vacancies": [
+          {
+            "title": "Frontend Developer",
+            "salary": "От 100 000 ₽",
+            "location": "Москва",
+            "type": "Полная занятость",
+            "description": "Разработка интерфейсов",
+            "requirements": ["React", "TypeScript"],
+            "benefits": ["ДМС", "Обучение"]
+          }
+        ]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "pdf": "string",
+        "filename": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

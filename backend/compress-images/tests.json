@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Compress images",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "images": [
+          {
+            "id": 4,
+            "url": "https://cdn.poehali.dev/projects/37487b42-26a7-4ea4-bd44-c9a83bc78370/bucket/1b730421-11b5-404a-8a95-5937124af9c6.jpg"
+          }
+        ]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {"results": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

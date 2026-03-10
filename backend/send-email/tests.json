@@ -1,0 +1,43 @@
+{
+  "tests": [
+    {
+      "name": "Test purchase email",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "type": "purchase",
+        "data": {
+          "name": "Иван Иванов",
+          "city": "Москва",
+          "specialty": "Стоматолог",
+          "phone": "+7 (999) 123-45-67",
+          "message": "Хочу купить лупы"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test testdrive email",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "type": "testdrive",
+        "data": {
+          "fullName": "Петр Петров",
+          "phone": "+7 (999) 999-99-99",
+          "specialty": "Терапевт",
+          "city": "Санкт-Петербург"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

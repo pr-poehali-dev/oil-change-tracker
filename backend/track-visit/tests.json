@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {
+      "name": "Track visit",
+      "method": "POST",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "none"
+    }
+  ]
+}
