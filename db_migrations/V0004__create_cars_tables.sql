@@ -1,0 +1,24 @@
+CREATE TABLE IF NOT EXISTS cars (
+  id TEXT PRIMARY KEY,
+  brand TEXT NOT NULL,
+  model TEXT NOT NULL,
+  year TEXT NOT NULL,
+  oil_interval INTEGER NOT NULL DEFAULT 5000,
+  guides JSONB NOT NULL DEFAULT '[]',
+  custom BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS car_specs (
+  car_id TEXT PRIMARY KEY REFERENCES cars(id),
+  specs JSONB NOT NULL DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS car_entries (
+  id SERIAL PRIMARY KEY,
+  car_id TEXT NOT NULL REFERENCES cars(id),
+  entry_date DATE NOT NULL,
+  km NUMERIC(10,1) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(car_id, entry_date)
+);

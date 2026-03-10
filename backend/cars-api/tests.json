@@ -1,0 +1,44 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Получить список автомобилей",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": [],
+      "bodyMatcher": "exact"
+    },
+    {
+      "name": "Создать автомобиль",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "id": "test_toyota_corolla_2020",
+        "brand": "Toyota",
+        "model": "Corolla",
+        "year": "2020",
+        "oilInterval": 10000,
+        "guides": [],
+        "custom": true,
+        "specs": [["Масло", "5W-30"], ["Объём", "4.5 л"]]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Список авто после создания",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": [{"id": "test_toyota_corolla_2020"}],
+      "bodyMatcher": "partial"
+    }
+  ]
+}
