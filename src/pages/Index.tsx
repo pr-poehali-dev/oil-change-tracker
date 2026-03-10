@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 
 type DayEntry = { date: string; km: number };
 type ManualStep = { step: number; title: string; items: string[]; img?: string; imgCaption?: string; warning?: string };
@@ -440,6 +441,20 @@ export default function Index() {
     localStorage.setItem(entriesKey(car.id), JSON.stringify(entries));
     localStorage.setItem(totalKey(car.id), String(totalKm));
   }, [entries, totalKm, car.id]);
+
+  // Локальные уведомления — планируем при остатке < 300 км
+  useEffect(() => {
+    const carName = `${car.brand} ${car.model}`;
+    const prev = getScheduledRemaining();
+    // Перепланируем если остаток изменился или не было запланировано
+    if (remaining < 300) {
+      if (prev === null || Math.abs(prev - remaining) >= 10) {
+        scheduleOilNotifications(Math.round(remaining), carName);
+      }
+    } else {
+      if (prev !== null) cancelOilNotifications();
+    }
+  }, [remaining, car]);
 
   // Закрытие дропдауна при клике снаружи
   useEffect(() => {
