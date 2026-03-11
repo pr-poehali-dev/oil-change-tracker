@@ -251,6 +251,7 @@ export default function Index() {
             <Icon name="Car" size={15} className="text-muted-foreground" />
             <span className="font-golos text-sm font-semibold text-foreground">{car.brand} {car.model}</span>
             <span className="font-mono text-xs text-muted-foreground">{car.year}</span>
+            {car.engine && <span className="font-mono text-xs text-muted-foreground hidden sm:inline">· {car.engine}</span>}
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-muted-foreground">интервал {OIL_INTERVAL.toLocaleString("ru-RU")} км</span>
@@ -583,7 +584,7 @@ export default function Index() {
               {(car.brand === "Toyota" || car.brand === "УАЗ") && <img src={car.brand === "УАЗ" ? IMG_COVER_UAZ : IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-center" style={{ height: 140 }} />}
               <div className="px-5 py-4">
                 <p className="font-golos font-bold text-foreground text-base">{guide.title}</p>
-                <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}</p>
+                <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}{car.engine ? ` · ${car.engine}` : ""}</p>
                 <p className="text-sm text-muted-foreground font-golos leading-relaxed mt-2">
                   Пошаговое руководство: {guide.steps.length} шагов.
                 </p>

@@ -13,6 +13,7 @@ export type CarConfig = {
   brand: string;
   model: string;
   year: string;
+  engine?: string;
   oilInterval: number;
   guides: ManualGuide[];
   custom?: boolean;

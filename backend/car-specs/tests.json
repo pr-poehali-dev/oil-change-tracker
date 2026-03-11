@@ -7,12 +7,12 @@
       "expectedStatus": 200
     },
     {
-      "name": "Получение спецификаций Toyota Camry 1990",
+      "name": "Подбор двигателей Toyota Camry 2010",
       "method": "POST",
       "path": "/",
-      "body": { "brand": "Toyota", "model": "Camry V30", "year": "1990" },
+      "body": { "brand": "Toyota", "model": "Camry", "year": "2010", "mode": "engines" },
       "expectedStatus": 200,
-      "expectedBody": { "oilInterval": 5000 },
+      "expectedBody": { "engines": [] },
       "bodyMatcher": "partial"
     },
     {

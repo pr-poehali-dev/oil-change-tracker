@@ -1,13 +1,13 @@
 import json
 import os
 import urllib.request
-# redeploy
 
 def handler(event: dict, context) -> dict:
     """
-    Получает спецификации автомобиля (масло, фильтр, интервал, инструкция) через OpenAI.
-    Принимает: brand, model, year
-    Возвращает: specs (список пар), oilInterval, guides (шаги замены масла)
+    Два режима:
+    1) POST /engines — подбирает список двигателей для brand/model/year
+    2) POST / — подбирает масло, фильтр, интервал и инструкцию с учётом engine
+    Принимает: brand, model, year, [engine]
     """
     cors = {
         'Access-Control-Allow-Origin': '*',
@@ -22,6 +22,7 @@ def handler(event: dict, context) -> dict:
     brand = body.get('brand', '').strip()
     model = body.get('model', '').strip()
     year = body.get('year', '').strip()
+    mode = body.get('mode', '').strip()
 
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
@@ -30,14 +31,39 @@ def handler(event: dict, context) -> dict:
     if not api_key:
         return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'DEEPSEEK_API_KEY не задан'})}
 
-    prompt = f"""Ты автомеханик-эксперт. Для автомобиля {brand} {model} {year} года выдай JSON (только JSON, без markdown):
+    # Режим 1: подбор двигателей
+    if mode == 'engines':
+        prompt = f"""Ты автомеханик-эксперт. Для автомобиля {brand} {model} {year} года перечисли все варианты двигателей, которые устанавливались.
+Выдай только JSON (без markdown):
+{{
+  "engines": [
+    {{
+      "id": "1az_fe",
+      "name": "1AZ-FE 2.0 бензин 150 л.с.",
+      "volume": "2.0",
+      "fuel": "бензин",
+      "power": "150"
+    }}
+  ]
+}}
+Указывай реальные двигатели. Если двигатель один — массив из одного элемента."""
+
+        result = _call_deepseek(api_key, prompt)
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
+
+    # Режим 2: подбор масла и инструкции
+    engine = body.get('engine', '').strip()
+    engine_str = f", двигатель {engine}" if engine else ""
+
+    prompt = f"""Ты автомеханик-эксперт. Для автомобиля {brand} {model} {year} года{engine_str} выдай JSON (только JSON, без markdown):
 {{
   "specs": [
     ["Масло", "10W-40 (или конкретная рекомендация)"],
     ["Объём", "4,5 л (с фильтром)"],
     ["Фильтр", "Артикул или рекомендация"],
     ["Пробка картера", "размер ключа и момент затяжки"],
-    ["Интервал", "например 10 000 км или 1 год"]
+    ["Интервал", "например 10 000 км или 1 год"],
+    ["Двигатель", "{engine if engine else 'стандартный'}"]
   ],
   "oilInterval": 10000,
   "guides": [
@@ -87,8 +113,13 @@ def handler(event: dict, context) -> dict:
   ]
 }}
 
-Адаптируй все детали конкретно под {brand} {model} {year}. Укажи реальные артикулы фильтров, правильную вязкость масла для российского климата, реальный объём двигателя и момент затяжки пробки."""
+Адаптируй все детали конкретно под {brand} {model} {year}{engine_str}. Укажи реальные артикулы фильтров, правильную вязкость масла для российского климата, реальный объём двигателя и момент затяжки пробки."""
 
+    result = _call_deepseek(api_key, prompt)
+    return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
+
+
+def _call_deepseek(api_key: str, prompt: str) -> dict:
     payload = json.dumps({
         'model': 'deepseek-chat',
         'messages': [
@@ -116,10 +147,4 @@ def handler(event: dict, context) -> dict:
     if content.startswith('```'):
         content = content.split('\n', 1)[1].rsplit('```', 1)[0].strip()
 
-    result = json.loads(content)
-
-    return {
-        'statusCode': 200,
-        'headers': cors,
-        'body': json.dumps(result, ensure_ascii=False)
-    }
+    return json.loads(content)
