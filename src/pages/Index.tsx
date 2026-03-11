@@ -581,7 +581,7 @@ export default function Index() {
             </div>
 
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              {(car.brand === "Toyota" || car.brand === "УАЗ") && <img src={car.brand === "УАЗ" ? IMG_COVER_UAZ : IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-center" style={{ height: 140 }} />}
+              {(car.id === "camry_v30_1990" || car.id === "uaz_396219_2008") && <img src={car.id === "uaz_396219_2008" ? IMG_COVER_UAZ : IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-center" style={{ height: 140 }} />}
               <div className="px-5 py-4">
                 <p className="font-golos font-bold text-foreground text-base">{guide.title}</p>
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}{car.engine ? ` · ${car.engine}` : ""}</p>
