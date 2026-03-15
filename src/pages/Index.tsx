@@ -570,9 +570,9 @@ export default function Index() {
         {tab === "instructions" && !activeGuide && (
           <div className="animate-fade-in space-y-3">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider px-1 mb-2">
-              Инструкции для {car.brand} {car.model}
+              Инструкции для {car?.brand} {car?.model}
             </p>
-            {car.guides.map((g) => (
+            {car?.guides.map((g) => (
               <button
                 key={g.id}
                 onClick={() => setActiveGuide(g.id)}
@@ -597,13 +597,13 @@ export default function Index() {
               </button>
             ))}
 
-            {car.guides.length === 0 && (
+            {car?.guides.length === 0 && (
               <div className="text-center py-8 text-muted-foreground text-sm font-golos">
                 Инструкций пока нет.<br />Добавьте свою ниже.
               </div>
             )}
 
-            {car.custom && (
+            {car?.custom && (
               <button
                 onClick={handleRefreshFilters}
                 disabled={filtersRefreshing}
