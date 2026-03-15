@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
-  CarConfig, ManualGuide, IMG_COVER, IMG_COVER_UAZ,
+  CarConfig, ManualGuide,
   DEFAULT_CARS, DEFAULT_SPECS,
 } from "@/lib/cars";
 import {
@@ -236,7 +236,7 @@ export default function Index() {
       const oilGuides: ManualGuide[] = specsData.guides || [];
       const filterGuides: ManualGuide[] = (filtersData.filters || []).map((f: ManualGuide) => ({
         id: f.id, title: f.title, icon: f.icon, steps: f.steps || [],
-        photo: f.photo, article: f.article, interval: f.interval,
+        article: f.article, interval: f.interval,
       }));
       const customGuides = car.guides.filter((g) => g.id.startsWith("custom_"));
       const updatedGuides = [...oilGuides, ...filterGuides, ...customGuides];
@@ -567,16 +567,6 @@ export default function Index() {
                 onClick={() => setActiveGuide(g.id)}
                 className="w-full bg-card border border-border rounded-2xl overflow-hidden hover:border-muted-foreground transition-colors text-left"
               >
-                {g.photo && (
-                  <div className="w-full h-28 overflow-hidden bg-secondary">
-                    <img
-                      src={g.photo}
-                      alt={g.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
-                  </div>
-                )}
                 <div className="px-5 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
@@ -646,11 +636,6 @@ export default function Index() {
             </div>
 
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              {guide.photo ? (
-                <img src={guide.photo} alt={guide.title} className="w-full object-cover object-center" style={{ height: 160 }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-              ) : (car.id === "camry_v30_1990" || car.id === "uaz_396219_2008") && (
-                <img src={car.id === "uaz_396219_2008" ? IMG_COVER_UAZ : IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-center" style={{ height: 140 }} />
-              )}
               <div className="px-5 py-4">
                 <p className="font-golos font-bold text-foreground text-base">{guide.title}</p>
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}{car.engine ? ` · ${car.engine}` : ""}</p>
@@ -698,14 +683,6 @@ export default function Index() {
                   </button>
                   {isOpen && (
                     <div className="px-5 pb-4 pt-2 border-t border-border/50 space-y-2.5 animate-fade-in">
-                      {section.img && (
-                        <div className="rounded-xl overflow-hidden bg-secondary mb-3">
-                          <img src={section.img} alt={section.imgCaption ?? section.title} className="w-full object-cover object-top" style={{ maxHeight: 180 }} />
-                          {section.imgCaption && (
-                            <p className="text-xs font-mono text-muted-foreground px-3 py-2">{section.imgCaption}</p>
-                          )}
-                        </div>
-                      )}
                       {section.items.map((item, i) => (
                         <div key={i} className="flex items-start gap-2.5">
                           <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0 mt-[7px]" />

@@ -105,12 +105,11 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
       if (specsData.oilInterval) setInterval(String(specsData.oilInterval));
 
       const filtersData = await filtersRes.json();
-      const filterGuides: CarConfig["guides"] = (filtersData.filters || []).map((f: { id: string; title: string; icon: string; steps: ManualStep[]; photo?: string; article?: string; interval?: string }) => ({
+      const filterGuides: CarConfig["guides"] = (filtersData.filters || []).map((f: { id: string; title: string; icon: string; steps: ManualStep[]; article?: string; interval?: string }) => ({
         id: f.id,
         title: f.title,
         icon: f.icon,
         steps: f.steps || [],
-        photo: f.photo,
         article: f.article,
         interval: f.interval,
       }));

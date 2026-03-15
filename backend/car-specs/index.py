@@ -1,12 +1,6 @@
 import json
 import os
 import urllib.request
-import urllib.parse
-
-def _search_filter_image(query):
-    """Возвращает URL фото фильтра через Unsplash source."""
-    encoded_q = urllib.parse.quote(query)
-    return "https://source.unsplash.com/400x300/?" + encoded_q
 
 
 def handler(event: dict, context) -> dict:
@@ -73,7 +67,7 @@ def handler(event: dict, context) -> dict:
 - Сортируй по объёму двигателя по возрастанию
 - Только реально существовавшие двигатели"""
 
-        result = _call_deepseek(api_key, prompt)
+        result = _call_deepseek(api_key, prompt, max_tokens=1000)
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
     # Режим 2: инструкции по замене фильтров с фото
@@ -92,7 +86,6 @@ def handler(event: dict, context) -> dict:
       "icon": "Wind",
       "article": "Toyota 17801-31090",
       "interval": "30 000 км или 2 года",
-      "photo_query": "Toyota Camry 2AZ air filter replacement",
       "steps": [
         {{
           "step": 1,
@@ -126,20 +119,11 @@ def handler(event: dict, context) -> dict:
 Для каждого фильтра:
 - article: точный артикул OEM или качественного аналога для {brand} {model} {year}{engine_str}
 - interval: реальный интервал замены
-- photo_query: поисковый запрос на английском для поиска фото этого фильтра на данном авто (марка модель год двигатель тип фильтра replacement)
 - steps: 3-5 детальных шагов с конкретными действиями для данного авто
 - Укажи расположение фильтра, нужные инструменты, момент затяжки где нужно"""
 
         result = _call_deepseek(api_key, prompt, max_tokens=2000)
-
-        # Добавляем фото к каждому фильтру
-        filters = result.get('filters', [])
-        for flt in filters:
-            default_query = brand + " " + model + " " + flt.get('title', 'filter')
-            query = flt.get('photo_query', default_query)
-            flt['photo'] = _search_filter_image(query)
-
-        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': filters}, ensure_ascii=False)}
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': result.get('filters', [])}, ensure_ascii=False)}
 
     # Режим 3: подбор масла и инструкции
     engine = body.get('engine', '').strip()
