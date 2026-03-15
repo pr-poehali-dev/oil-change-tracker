@@ -32,11 +32,12 @@ def handler(event: dict, context) -> dict:
     eng = f", двиг. {engine}" if engine else ""
 
     if mode == 'engines':
-        prompt = f"""Список двигателей {car}. JSON без markdown:
-{{"engines":[{{"id":"код_snake","name":"Код Объём топливо мощность л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}}
-Все реальные двигатели, сортировка по объёму."""
+        prompt = f"""Ты автомеханик-эксперт. Для {car} выдай ПОЛНЫЙ список всех двигателей. JSON без markdown:
+{{"engines":[{{"id":"2az_fe","name":"2AZ-FE 2.4 бензин 167 л.с.","volume":"2.4","fuel":"бензин","power":"167"}}]}}
+Включи ВСЕ: разные объёмы, бензин/дизель/гибрид, разные мощности одного объёма, рынки EU/JP/US/RU, до/после рестайлинга.
+id: snake_case уникальный. Сортировка по объёму. Только реально существовавшие."""
 
-        result = _call_ai(api_key, prompt, max_tokens=800)
+        result = _call_ai(api_key, prompt, max_tokens=1500)
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
     if mode == 'filters':
