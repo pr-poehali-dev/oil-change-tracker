@@ -563,7 +563,8 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         setSpecsLoaded(true);
         return;
       }
-      const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim(), ...(generation?.name ? { generation: generation.name } : {}) };
+      const tempId = generateCarId(brand.trim(), model.trim(), year.trim());
+      const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim(), carId: tempId, ...(generation?.name ? { generation: generation.name } : {}) };
       const engineName = engine?.name;
       const body = engineName ? { ...baseBody, engine: engineName } : baseBody;
       const res = await fetch(CAR_SPECS_URL, {
@@ -591,7 +592,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
 
   async function fetchFiltersInBackground(carId: string, engineName?: string) {
     try {
-      const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim(), ...(generation?.name ? { generation: generation.name } : {}) };
+      const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim(), carId, ...(generation?.name ? { generation: generation.name } : {}) };
       const body = engineName ? { ...baseBody, engine: engineName, mode: "filters" } : { ...baseBody, mode: "filters" };
       const res = await fetch(CAR_SPECS_URL, {
         method: "POST",

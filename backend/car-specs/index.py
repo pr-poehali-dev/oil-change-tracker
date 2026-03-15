@@ -1,11 +1,18 @@
 import json
 import os
 import urllib.request
+import psycopg2  # noqa: F401 — required, installed via requirements.txt
 from engines_db import ENGINES_DB
+
+SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 't_p21156567_oil_change_tracker')
+
+
+def get_conn():
+    return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
 def handler(event: dict, context) -> dict:
-    """Подбор двигателей, масла, фильтров для автомобиля через ИИ."""
+    """Подбор двигателей, масла, фильтров для автомобиля через ИИ с кешем в БД."""
     cors = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -20,21 +27,23 @@ def handler(event: dict, context) -> dict:
     model = body.get('model', '').strip()
     year = body.get('year', '').strip()
     mode = body.get('mode', '').strip()
+    car_id = body.get('carId', '').strip()
+    force_refresh = body.get('forceRefresh', False)
 
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
     deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
     openai_key = os.environ.get('OPENAI_API_KEY', '')
-    if openai_key:
-        api_key = openai_key
-        use_openai = True
-    elif deepseek_key:
+    if deepseek_key:
         api_key = deepseek_key
         use_openai = False
+    elif openai_key:
+        api_key = openai_key
+        use_openai = True
     else:
         api_key = ''
-        use_openai = True
+        use_openai = False
 
     generation = body.get('generation', '').strip()
     car = f"{brand} {model} {year}" + (f" ({generation})" if generation else "")
@@ -58,18 +67,39 @@ def handler(event: dict, context) -> dict:
         return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'API key не задан'})}
 
     if mode == 'filters':
+        if car_id and not force_refresh:
+            cached = _get_cached_filters(car_id)
+            if cached:
+                print(f"Cache hit filters: {car_id}")
+                return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': cached}, ensure_ascii=False)}
+
         prompt = f"""Инструкции замены фильтров {car}{eng}. JSON без markdown:
 {{"filters":[{{"id":"air_filter","title":"Воздушный фильтр","icon":"Wind","article":"OEM артикул","interval":"30000 км","steps":[{{"step":1,"title":"Шаг","items":["действие"],"warning":null}}]}}]}}
 Фильтры: воздушный(Wind), масляный(Droplets), салонный(AirVent), топливный(Fuel). По 3 шага каждый. Реальные артикулы."""
 
         result = _call_ai(api_key, prompt, max_tokens=1500, use_openai=use_openai)
-        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': result.get('filters', [])}, ensure_ascii=False)}
+        filters = result.get('filters', [])
+
+        if car_id and filters:
+            _save_cached_filters(car_id, filters)
+
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': filters}, ensure_ascii=False)}
+
+    if car_id and not force_refresh:
+        cached = _get_cached_guides(car_id)
+        if cached:
+            print(f"Cache hit guides: {car_id}")
+            return {'statusCode': 200, 'headers': cors, 'body': json.dumps(cached, ensure_ascii=False)}
 
     prompt = f"""Подбор масла {car}{eng}. JSON без markdown:
 {{"specs":[["Масло","вязкость"],["Объём","X л"],["Фильтр","артикул"],["Пробка","ключ и момент"],["Интервал","км"],["Двигатель","{engine or 'стандартный'}"]],"oilInterval":10000,"guides":[{{"id":"oil","title":"Замена масла","icon":"Droplets","steps":[{{"step":1,"title":"Подготовка","items":["Прогреть 5 мин","Подготовить масло, фильтр, ёмкость"],"warning":null}},{{"step":2,"title":"Слив","items":["Поднять авто","Открутить пробку","Слить 15 мин"],"warning":"Масло горячее!"}},{{"step":3,"title":"Фильтр","items":["Снять старый","Смазать кольцо нового","Установить"],"warning":null}},{{"step":4,"title":"Заливка","items":["Закрутить пробку","Залить масло","Проверить уровень"],"warning":null}},{{"step":5,"title":"Проверка","items":["Завести на 2 мин","Проверить подтёки","Проверить уровень"],"warning":null}}]}}]}}
 Адаптируй под конкретный автомобиль: артикулы, вязкость, объём, момент затяжки."""
 
     result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
+
+    if car_id and result.get('guides'):
+        _save_cached_guides(car_id, result)
+
     return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
 
@@ -84,7 +114,65 @@ def _find_local_engines(brand: str, model: str) -> list:
     return []
 
 
-def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool = True) -> dict:
+def _get_cached_filters(car_id: str) -> list:
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"SELECT filters FROM {SCHEMA}.cars WHERE id = %s", (car_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception as e:
+        print(f"Cache read filters error: {e}")
+    return []
+
+
+def _save_cached_filters(car_id: str, filters: list):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.cars SET filters = %s WHERE id = %s",
+                    (json.dumps(filters, ensure_ascii=False), car_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Cache save filters error: {e}")
+
+
+def _get_cached_guides(car_id: str) -> dict:
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"SELECT c.guides, cs.specs, c.oil_interval FROM {SCHEMA}.cars c LEFT JOIN {SCHEMA}.car_specs cs ON cs.car_id = c.id WHERE c.id = %s", (car_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0]:
+            return {'guides': row[0], 'specs': row[1] or [], 'oilInterval': row[2] or 10000}
+    except Exception as e:
+        print(f"Cache read guides error: {e}")
+    return {}
+
+
+def _save_cached_guides(car_id: str, result: dict):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        guides = result.get('guides', [])
+        specs = result.get('specs', [])
+        oil_interval = result.get('oilInterval', 10000)
+        cur.execute(f"UPDATE {SCHEMA}.cars SET guides = %s, oil_interval = %s WHERE id = %s",
+                    (json.dumps(guides, ensure_ascii=False), oil_interval, car_id))
+        cur.execute(f"""INSERT INTO {SCHEMA}.car_specs (car_id, specs) VALUES (%s, %s)
+                    ON CONFLICT (car_id) DO UPDATE SET specs = EXCLUDED.specs""",
+                    (car_id, json.dumps(specs, ensure_ascii=False)))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Cache save guides error: {e}")
+
+
+def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool = False) -> dict:
     if use_openai:
         ai_model = 'gpt-4o-mini'
         url = 'https://api.openai.com/v1/chat/completions'

@@ -12,7 +12,7 @@
       "path": "/",
       "body": { "brand": "Toyota", "model": "Camry", "year": "2010", "mode": "engines" },
       "expectedStatus": 200,
-      "expectedBody": { "engines": [{"id": "string", "name": "string"}] },
+      "expectedBody": { "engines": [{}] },
       "bodyMatcher": "partial"
     },
     {

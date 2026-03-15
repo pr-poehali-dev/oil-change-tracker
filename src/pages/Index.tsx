@@ -221,17 +221,15 @@ export default function Index() {
     if (!car?.custom || filtersRefreshing) return;
     setFiltersRefreshing(true);
     try {
-      const baseBody = { brand: car.brand, model: car.model, year: car.year, ...(car.engine ? { engine: car.engine } : {}) };
-      const [specsRes, filtersRes] = await Promise.all([
-        fetch("https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(baseBody),
-        }),
-        fetch("https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...baseBody, mode: "filters" }),
-        }),
-      ]);
+      const baseBody = { brand: car.brand, model: car.model, year: car.year, carId: car.id, forceRefresh: true, ...(car.engine ? { engine: car.engine } : {}) };
+      const specsRes = await fetch("https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(baseBody),
+      });
+      const filtersRes = await fetch("https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...baseBody, mode: "filters" }),
+      });
       const specsData = await specsRes.json();
       const filtersData = await filtersRes.json();
       const oilGuides: ManualGuide[] = specsData.guides || [];
