@@ -476,7 +476,7 @@ export default function Index() {
               Сбросить счётчик после замены масла
             </button>
 
-            {car.custom && (
+            {car?.custom && (
               <button
                 onClick={() => setConfirmDeleteCar(true)}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-border text-muted-foreground text-sm font-golos hover:text-destructive hover:border-destructive/30 active:scale-95 transition-all"
