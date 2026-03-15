@@ -40,17 +40,15 @@ export const apiUpdateOrder = (id: number, data: Record<string, unknown>) =>
   req(`${URLS.orders}/${id}`, "PUT", data);
 
 // Cars
+const carsPost = (body: Record<string, unknown>) => req(URLS.cars, "POST", body);
 export const apiGetCars = () => req(URLS.cars);
-export const apiCreateCar = (data: Record<string, unknown>) => req(URLS.cars, "POST", data);
-export const apiUpdateCar = (id: string, data: Record<string, unknown>) => req(`${URLS.cars}/${id}`, "PUT", data);
-export const apiDeleteCar = (id: string) => req(`${URLS.cars}/${id}`, "DELETE");
-export const apiSearchCar = (brand: string, model: string, year: string) =>
-  req(`${URLS.cars}/search`, "POST", { brand, model, year });
-export const apiGetEntries = (carId: string) => req(`${URLS.cars}/entries/${carId}`);
-export const apiSaveEntry = (carId: string, date: string, km: number) =>
-  req(`${URLS.cars}/entries`, "POST", { carId, date, km });
-export const apiDeleteEntry = (carId: string, date: string) =>
-  req(`${URLS.cars}/entries/${carId}/${date}`, "DELETE");
+export const apiCreateCar = (data: Record<string, unknown>) => carsPost({ action: "create_car", ...data });
+export const apiUpdateCar = (id: string, data: Record<string, unknown>) => carsPost({ action: "update_car", id, ...data });
+export const apiDeleteCar = (id: string) => carsPost({ action: "delete_car", id });
+export const apiSearchCar = (brand: string, model: string, year: string) => carsPost({ action: "search_car", brand, model, year });
+export const apiGetEntries = (carId: string) => carsPost({ action: "get_entries", carId });
+export const apiSaveEntry = (carId: string, date: string, km: number) => carsPost({ action: "save_entry", carId, date, km });
+export const apiDeleteEntry = (carId: string, date: string) => carsPost({ action: "delete_entry", carId, date });
 
 // Documents
 export const apiGetDocuments = (params?: { type?: string }) => {

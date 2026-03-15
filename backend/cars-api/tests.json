@@ -7,7 +7,7 @@
       "expectedStatus": 200
     },
     {
-      "name": "Получить список автомобилей",
+      "name": "GET список автомобилей",
       "method": "GET",
       "path": "/",
       "expectedStatus": 200
@@ -17,24 +17,45 @@
       "method": "POST",
       "path": "/",
       "body": {
-        "id": "test_toyota_corolla_2020",
+        "action": "create_car",
+        "id": "test_car_2020",
         "brand": "Toyota",
-        "model": "Corolla",
+        "model": "Test",
         "year": "2020",
         "oilInterval": 10000,
         "guides": [],
         "custom": true,
-        "specs": [["Масло", "5W-30"], ["Объём", "4.5 л"]]
+        "specs": []
       },
       "expectedStatus": 200,
       "expectedBody": {"ok": true},
       "bodyMatcher": "partial"
     },
     {
-      "name": "GET список (финальная проверка)",
-      "method": "GET",
+      "name": "Поиск авто в БД",
+      "method": "POST",
       "path": "/",
-      "expectedStatus": 200
+      "body": {
+        "action": "search_car",
+        "brand": "Toyota",
+        "model": "Test",
+        "year": "2020"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {"found": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Удалить автомобиль",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "delete_car",
+        "id": "test_car_2020"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
     }
   ]
 }

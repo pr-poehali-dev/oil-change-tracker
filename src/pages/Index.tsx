@@ -7,7 +7,7 @@ import {
 } from "@/lib/cars";
 import {
   apiGetCars, apiCreateCar, apiDeleteCar, apiUpdateCar,
-  apiGetEntries, apiSaveEntry,
+  apiGetEntries, apiSaveEntry, apiDeleteEntry,
 } from "@/api";
 import AddCarModal from "@/components/AddCarModal";
 import AddGuideModal from "@/components/AddGuideModal";
@@ -148,7 +148,7 @@ export default function Index() {
   async function handleReset() {
     if (!car) return;
     for (const e of entries) {
-      await fetch(`https://functions.poehali.dev/569f47e9-9c87-4e78-aac2-72676d772a07/entries/${car.id}/${e.date}`, { method: "DELETE" }).catch(() => {});
+      await apiDeleteEntry(car.id, e.date).catch(() => {});
     }
     setEntries([]);
     setTotalKm(0);
