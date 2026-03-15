@@ -43,7 +43,7 @@ def handler(event: dict, context) -> dict:
     if '/specs' in path:
         return handle_specs(method, path, event)
 
-    if '/search' in path and method == 'GET':
+    if '/search' in path:
         return handle_search(event)
 
     # /  — список всех авто
@@ -198,11 +198,11 @@ def handle_entries(method, path, event):
 
 
 def handle_search(event):
-    """Поиск авто в БД по brand, model, year (нечёткий, без учёта регистра)."""
-    params = event.get('queryStringParameters') or {}
-    brand = params.get('brand', '').strip().lower()
-    model = params.get('model', '').strip().lower()
-    year = params.get('year', '').strip()
+    """Поиск авто в БД по brand, model, year через POST body."""
+    body = json.loads(event.get('body') or '{}')
+    brand = body.get('brand', '').strip().lower()
+    model = body.get('model', '').strip().lower()
+    year = body.get('year', '').strip()
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""

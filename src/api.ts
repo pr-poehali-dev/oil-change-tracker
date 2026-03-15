@@ -44,10 +44,8 @@ export const apiGetCars = () => req(URLS.cars);
 export const apiCreateCar = (data: Record<string, unknown>) => req(URLS.cars, "POST", data);
 export const apiUpdateCar = (id: string, data: Record<string, unknown>) => req(`${URLS.cars}/${id}`, "PUT", data);
 export const apiDeleteCar = (id: string) => req(`${URLS.cars}/${id}`, "DELETE");
-export const apiSearchCar = (brand: string, model: string, year: string) => {
-  const qs = new URLSearchParams({ brand, model, year });
-  return fetch(`${URLS.cars}/search?${qs}`).then((r) => r.json());
-};
+export const apiSearchCar = (brand: string, model: string, year: string) =>
+  req(`${URLS.cars}/search`, "POST", { brand, model, year });
 export const apiGetEntries = (carId: string) => req(`${URLS.cars}/entries/${carId}`);
 export const apiSaveEntry = (carId: string, date: string, km: number) =>
   req(`${URLS.cars}/entries`, "POST", { carId, date, km });
