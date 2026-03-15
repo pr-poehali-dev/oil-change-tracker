@@ -214,6 +214,44 @@ export default function Index() {
     showNotif("Инструкция удалена");
   }
 
+  const [filtersRefreshing, setFiltersRefreshing] = useState(false);
+
+  async function handleRefreshFilters() {
+    if (!car.custom || filtersRefreshing) return;
+    setFiltersRefreshing(true);
+    try {
+      const baseBody = { brand: car.brand, model: car.model, year: car.year, ...(car.engine ? { engine: car.engine } : {}) };
+      const [specsRes, filtersRes] = await Promise.all([
+        fetch("https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(baseBody),
+        }),
+        fetch("https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...baseBody, mode: "filters" }),
+        }),
+      ]);
+      const specsData = await specsRes.json();
+      const filtersData = await filtersRes.json();
+      const oilGuides: ManualGuide[] = specsData.guides || [];
+      const filterGuides: ManualGuide[] = (filtersData.filters || []).map((f: ManualGuide) => ({
+        id: f.id, title: f.title, icon: f.icon, steps: f.steps || [],
+        photo: f.photo, article: f.article, interval: f.interval,
+      }));
+      const customGuides = car.guides.filter((g) => g.id.startsWith("custom_"));
+      const updatedGuides = [...oilGuides, ...filterGuides, ...customGuides];
+      setCustomCars((prev) =>
+        prev.map((c) => c.id === car.id ? { ...c, guides: updatedGuides } : c)
+      );
+      await apiUpdateCar(car.id, { guides: updatedGuides }).catch(() => {});
+      showNotif("Инструкции обновлены!");
+    } catch {
+      showNotif("Не удалось обновить инструкции");
+    } finally {
+      setFiltersRefreshing(false);
+    }
+  }
+
   const circumference = 2 * Math.PI * 54;
   const dash = circumference * (1 - progress);
   const urgencyColor = urgency === "danger" ? "#e05a2b" : urgency === "warn" ? "#c9922a" : "#4a7c59";
@@ -562,6 +600,17 @@ export default function Index() {
               <div className="text-center py-8 text-muted-foreground text-sm font-golos">
                 Инструкций пока нет.<br />Добавьте свою ниже.
               </div>
+            )}
+
+            {car.custom && (
+              <button
+                onClick={handleRefreshFilters}
+                disabled={filtersRefreshing}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-secondary text-foreground text-sm font-golos hover:bg-muted active:scale-95 transition-all disabled:opacity-60"
+              >
+                <Icon name={filtersRefreshing ? "Loader2" : "RefreshCw"} size={15} className={filtersRefreshing ? "animate-spin" : ""} />
+                {filtersRefreshing ? "Обновляю инструкции..." : "Обновить инструкции по фильтрам"}
+              </button>
             )}
 
             <button
