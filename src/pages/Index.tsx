@@ -329,7 +329,7 @@ export default function Index() {
                     {c.brand} {c.model}
                   </span>
                   <span className="font-mono text-xs text-muted-foreground">{c.year}</span>
-                  {c.custom && <span className="font-mono text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-md">мой</span>}
+
                 </div>
                 {c.id === selectedCarId && <Icon name="Check" size={14} className="text-foreground shrink-0" />}
               </button>

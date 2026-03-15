@@ -1,6 +1,17 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { CarConfig, ManualGuide, ManualStep, generateCarId } from "@/lib/cars";
+
+const CAR_BRANDS = [
+  "Acura","Alfa Romeo","Aston Martin","Audi","Bentley","BMW","Bugatti","Buick",
+  "Cadillac","Chery","Chevrolet","Chrysler","Citroën","Dacia","Daewoo","Daihatsu",
+  "Dodge","DS","Ferrari","Fiat","Ford","GAZ","Geely","Genesis","GMC","Great Wall",
+  "Haval","Honda","Hyundai","Infiniti","Isuzu","Jaguar","Jeep","Kia","Lamborghini",
+  "Lancia","Land Rover","Lexus","Lada","Lincoln","Lotus","Maserati","Mazda",
+  "McLaren","Mercedes-Benz","Mini","Mitsubishi","Nissan","Opel","Peugeot","Porsche",
+  "RAM","Renault","Rolls-Royce","Saab","SEAT","Skoda","Smart","Subaru","Suzuki",
+  "Tesla","Toyota","UAZ","УАЗ","Vauxhall","Volkswagen","Volvo","Zotye",
+];
 
 const CAR_SPECS_URL = "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23";
 
@@ -20,6 +31,9 @@ type Props = {
 
 export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   const [brand, setBrand] = useState("");
+  const [brandSuggestions, setBrandSuggestions] = useState<string[]>([]);
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const brandRef = useRef<HTMLDivElement>(null);
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [interval, setInterval] = useState("");
@@ -35,6 +49,37 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   const [specsError, setSpecsError] = useState("");
   const [aiGuides, setAiGuides] = useState<CarConfig["guides"]>([]);
   const [aiSpecs, setAiSpecs] = useState<[string, string][]>([]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (brandRef.current && !brandRef.current.contains(e.target as Node)) {
+        setShowBrandDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleBrandChange(value: string) {
+    setBrand(value);
+    resetOnCarChange();
+    if (value.trim().length > 0) {
+      const q = value.toLowerCase();
+      const filtered = CAR_BRANDS.filter(b => b.toLowerCase().startsWith(q)).slice(0, 6);
+      setBrandSuggestions(filtered);
+      setShowBrandDropdown(filtered.length > 0);
+    } else {
+      setBrandSuggestions([]);
+      setShowBrandDropdown(false);
+    }
+  }
+
+  function selectBrand(b: string) {
+    setBrand(b);
+    setBrandSuggestions([]);
+    setShowBrandDropdown(false);
+    resetOnCarChange();
+  }
 
   const canFetchEngines = brand.trim().length > 0 && model.trim().length > 0 && year.trim().length === 4;
 
@@ -164,13 +209,29 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         </div>
 
         <div className="space-y-3">
-          <div>
+          <div ref={brandRef} className="relative">
             <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Марка</label>
             <input
-              value={brand} onChange={(e) => { setBrand(e.target.value); resetOnCarChange(); }}
+              value={brand}
+              onChange={(e) => handleBrandChange(e.target.value)}
+              onFocus={() => { if (brandSuggestions.length > 0) setShowBrandDropdown(true); }}
               placeholder="Toyota, УАЗ, Lada..."
               className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-golos text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
             />
+            {showBrandDropdown && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+                {brandSuggestions.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onMouseDown={() => selectBrand(b)}
+                    className="w-full px-4 py-2.5 text-left text-sm font-golos text-foreground hover:bg-secondary transition-colors"
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Модель</label>
