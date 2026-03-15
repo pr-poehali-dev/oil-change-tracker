@@ -35,9 +35,9 @@ def handler(event: dict, context) -> dict:
     eng = f", двиг. {engine}" if engine else ""
 
     if mode == 'engines':
-        prompt = f'Двигатели {car} JSON: {{"engines":[{{"id":"str","name":"str","volume":"str","fuel":"str","power":"str"}}]}} Все варианты бензин/дизель/гибрид до 15шт.'
+        prompt = f'List engines for {car}. JSON only: {{"engines":[{{"id":"1","name":"2.0 MT","volume":"2.0","fuel":"petrol","power":"150 hp"}}]}} Up to 8 variants.'
 
-        result = _call_ai(api_key, prompt, max_tokens=900, use_openai=use_openai)
+        result = _call_ai(api_key, prompt, max_tokens=500, use_openai=use_openai)
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
     if mode == 'filters':
@@ -69,11 +69,12 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
     payload = json.dumps({
         'model': model,
         'messages': [
-            {'role': 'system', 'content': 'Отвечай только валидным JSON. Без markdown. Без пояснений.'},
+            {'role': 'system', 'content': 'Reply with valid JSON only. No markdown. No explanation.'},
             {'role': 'user', 'content': prompt}
         ],
         'temperature': 0.1,
         'max_tokens': max_tokens,
+        'stream': False,
         **extra,
     }).encode('utf-8')
 
@@ -88,7 +89,7 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode('utf-8'))
     except Exception as e:
         print(f"AI call failed: {e}")
