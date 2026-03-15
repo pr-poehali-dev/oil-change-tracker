@@ -1,13 +1,48 @@
 import json
 import os
 import urllib.request
+import urllib.parse
+
+def _search_filter_image(query):
+    """Ищет фото фильтра через DuckDuckGo Images и возвращает URL первой картинки."""
+    encoded_q = urllib.parse.quote(query)
+    try:
+        vqd_url = "https://duckduckgo.com/?q=" + encoded_q + "&ia=images"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        req = urllib.request.Request(vqd_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as r:
+            html = r.read().decode("utf-8", errors="ignore")
+        vqd = ""
+        marker = "vqd="
+        idx = html.find(marker)
+        if idx != -1:
+            rest = html[idx + len(marker):]
+            if rest.startswith('"'):
+                vqd = rest[1:rest.index('"', 1)]
+            elif rest.startswith("'"):
+                vqd = rest[1:rest.index("'", 1)]
+            else:
+                vqd = rest.split("&")[0].split('"')[0].split("'")[0][:30]
+        if vqd:
+            img_url = "https://duckduckgo.com/i.js?q=" + encoded_q + "&vqd=" + vqd + "&o=json"
+            req2 = urllib.request.Request(img_url, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://duckduckgo.com/"})
+            with urllib.request.urlopen(req2, timeout=8) as r2:
+                data = json.loads(r2.read().decode("utf-8"))
+            results = data.get("results", [])
+            if results:
+                return results[0].get("image", "")
+    except Exception:
+        pass
+    return "https://source.unsplash.com/400x300/?" + encoded_q
+
 
 def handler(event: dict, context) -> dict:
     """
-    Два режима:
-    1) POST /engines — подбирает список двигателей для brand/model/year
-    2) POST / — подбирает масло, фильтр, интервал и инструкцию с учётом engine
-    Принимает: brand, model, year, [engine]
+    Три режима:
+    1) POST + mode=engines — подбирает список двигателей для brand/model/year
+    2) POST + mode=filters — инструкции по замене фильтров с фото для конкретного двигателя
+    3) POST / (без mode) — подбирает масло, фильтр, интервал и инструкцию с учётом engine
+    Принимает: brand, model, year, [engine], [mode]
     """
     cors = {
         'Access-Control-Allow-Origin': '*',
@@ -68,7 +103,72 @@ def handler(event: dict, context) -> dict:
         result = _call_deepseek(api_key, prompt)
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
-    # Режим 2: подбор масла и инструкции
+    # Режим 2: инструкции по замене фильтров с фото
+    if mode == 'filters':
+        engine = body.get('engine', '').strip()
+        engine_str = f", двигатель {engine}" if engine else ""
+
+        prompt = f"""Ты автомеханик-эксперт. Для автомобиля {brand} {model} {year} года{engine_str} составь подробные инструкции по замене ВСЕХ фильтров.
+
+Выдай только JSON (без markdown):
+{{
+  "filters": [
+    {{
+      "id": "air_filter",
+      "title": "Воздушный фильтр",
+      "icon": "Wind",
+      "article": "Toyota 17801-31090",
+      "interval": "30 000 км или 2 года",
+      "photo_query": "Toyota Camry 2AZ air filter replacement",
+      "steps": [
+        {{
+          "step": 1,
+          "title": "Подготовка",
+          "items": ["Откройте капот", "Найдите корпус воздушного фильтра — чёрный пластиковый короб"],
+          "warning": null
+        }},
+        {{
+          "step": 2,
+          "title": "Снятие корпуса",
+          "items": ["Отсоедините воздуховод", "Откройте 4 зажима корпуса фильтра"],
+          "warning": null
+        }},
+        {{
+          "step": 3,
+          "title": "Замена фильтра",
+          "items": ["Извлеките старый фильтр", "Установите новый фильтр артикул {engine}"],
+          "warning": null
+        }}
+      ]
+    }}
+  ]
+}}
+
+Включи ОБЯЗАТЕЛЬНО эти типы фильтров (если применимы к данному авто):
+1. Воздушный фильтр (air_filter) — icon: "Wind"
+2. Масляный фильтр (oil_filter) — icon: "Droplets"
+3. Салонный фильтр / фильтр кондиционера (cabin_filter) — icon: "AirVent"
+4. Топливный фильтр (fuel_filter) — icon: "Fuel"
+
+Для каждого фильтра:
+- article: точный артикул OEM или качественного аналога для {brand} {model} {year}{engine_str}
+- interval: реальный интервал замены
+- photo_query: поисковый запрос на английском для поиска фото этого фильтра на данном авто (марка модель год двигатель тип фильтра replacement)
+- steps: 3-5 детальных шагов с конкретными действиями для данного авто
+- Укажи расположение фильтра, нужные инструменты, момент затяжки где нужно"""
+
+        result = _call_deepseek(api_key, prompt, max_tokens=3000)
+
+        # Добавляем фото к каждому фильтру
+        filters = result.get('filters', [])
+        for flt in filters:
+            default_query = brand + " " + model + " " + flt.get('title', 'filter')
+            query = flt.get('photo_query', default_query)
+            flt['photo'] = _search_filter_image(query)
+
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': filters}, ensure_ascii=False)}
+
+    # Режим 3: подбор масла и инструкции
     engine = body.get('engine', '').strip()
     engine_str = f", двигатель {engine}" if engine else ""
 
@@ -136,7 +236,7 @@ def handler(event: dict, context) -> dict:
     return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
 
-def _call_deepseek(api_key: str, prompt: str) -> dict:
+def _call_deepseek(api_key: str, prompt: str, max_tokens: int = 2000) -> dict:
     payload = json.dumps({
         'model': 'deepseek-chat',
         'messages': [
@@ -144,7 +244,7 @@ def _call_deepseek(api_key: str, prompt: str) -> dict:
             {'role': 'user', 'content': prompt}
         ],
         'temperature': 0.2,
-        'max_tokens': 2000,
+        'max_tokens': max_tokens,
     }).encode('utf-8')
 
     req = urllib.request.Request(

@@ -7,7 +7,7 @@ export type ManualStep = {
   imgCaption?: string;
   warning?: string;
 };
-export type ManualGuide = { id: string; title: string; icon: string; steps: ManualStep[] };
+export type ManualGuide = { id: string; title: string; icon: string; steps: ManualStep[]; photo?: string; article?: string; interval?: string; };
 export type CarConfig = {
   id: string;
   brand: string;

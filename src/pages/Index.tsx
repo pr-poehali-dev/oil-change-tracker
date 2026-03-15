@@ -527,18 +527,34 @@ export default function Index() {
               <button
                 key={g.id}
                 onClick={() => setActiveGuide(g.id)}
-                className="w-full bg-card border border-border rounded-2xl px-5 py-4 flex items-center justify-between hover:border-muted-foreground transition-colors text-left"
+                className="w-full bg-card border border-border rounded-2xl overflow-hidden hover:border-muted-foreground transition-colors text-left"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                    <Icon name={g.icon as "Droplets"} size={18} className="text-foreground" />
+                {g.photo && (
+                  <div className="w-full h-28 overflow-hidden bg-secondary">
+                    <img
+                      src={g.photo}
+                      alt={g.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
                   </div>
-                  <div>
-                    <p className="font-golos font-semibold text-foreground text-sm">{g.title}</p>
-                    <p className="font-mono text-xs text-muted-foreground mt-0.5">{g.steps.length} шагов</p>
+                )}
+                <div className="px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                      <Icon name={g.icon as "Droplets"} size={18} className="text-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-golos font-semibold text-foreground text-sm">{g.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <p className="font-mono text-xs text-muted-foreground">{g.steps.length} шагов</p>
+                        {g.article && <p className="font-mono text-xs text-muted-foreground">· {g.article}</p>}
+                        {g.interval && <p className="font-mono text-xs text-muted-foreground">· {g.interval}</p>}
+                      </div>
+                    </div>
                   </div>
+                  <Icon name="ChevronRight" size={16} className="text-muted-foreground shrink-0" />
                 </div>
-                <Icon name="ChevronRight" size={16} className="text-muted-foreground shrink-0" />
               </button>
             ))}
 
@@ -581,10 +597,30 @@ export default function Index() {
             </div>
 
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              {(car.id === "camry_v30_1990" || car.id === "uaz_396219_2008") && <img src={car.id === "uaz_396219_2008" ? IMG_COVER_UAZ : IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-center" style={{ height: 140 }} />}
+              {guide.photo ? (
+                <img src={guide.photo} alt={guide.title} className="w-full object-cover object-center" style={{ height: 160 }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              ) : (car.id === "camry_v30_1990" || car.id === "uaz_396219_2008") && (
+                <img src={car.id === "uaz_396219_2008" ? IMG_COVER_UAZ : IMG_COVER} alt={`${car.brand} ${car.model}`} className="w-full object-cover object-center" style={{ height: 140 }} />
+              )}
               <div className="px-5 py-4">
                 <p className="font-golos font-bold text-foreground text-base">{guide.title}</p>
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">{car.brand} {car.model} · {car.year}{car.engine ? ` · ${car.engine}` : ""}</p>
+                {(guide.article || guide.interval) && (
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    {guide.article && (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-mono bg-secondary px-2.5 py-1 rounded-lg text-foreground">
+                        <Icon name="Tag" size={11} className="text-muted-foreground" />
+                        {guide.article}
+                      </span>
+                    )}
+                    {guide.interval && (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-mono bg-secondary px-2.5 py-1 rounded-lg text-foreground">
+                        <Icon name="Clock" size={11} className="text-muted-foreground" />
+                        {guide.interval}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground font-golos leading-relaxed mt-2">
                   Пошаговое руководство: {guide.steps.length} шагов.
                 </p>
