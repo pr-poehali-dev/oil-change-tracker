@@ -73,9 +73,7 @@ const CAR_MODELS: Record<string, string[]> = {
   "Hino": ["300","500","700","Dutro","Ranger","Profia"],
 };
 
-type Generation = { name: string; years: string };
-
-const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
+/*BLOCK_START
   "Toyota": {
     "Corolla": [
       { name: "E80", years: "1983–1987" },
@@ -565,9 +563,8 @@ const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
       { name: "JL", years: "2018–н.в." },
     ],
   },
-};
+}; BLOCK_END*/
 
-// Поколения: { brand: { model: [ { name, years } ] } }
 type Generation = { name: string; years: string };
 const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
   "Toyota": {
