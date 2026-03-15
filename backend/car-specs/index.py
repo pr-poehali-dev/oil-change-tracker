@@ -35,7 +35,7 @@ def handler(event: dict, context) -> dict:
     eng = f", двиг. {engine}" if engine else ""
 
     if mode == 'engines':
-        prompt = f'List engines for {car}. JSON only: {{"engines":[{{"id":"1","name":"2.0 MT","volume":"2.0","fuel":"petrol","power":"150 hp"}}]}} Up to 8 variants.'
+        prompt = f'Engines for {car}. JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} Up to 8. Name must include engine code, volume, fuel type, power in hp. Russian fuel names.'
 
         result = _call_ai(api_key, prompt, max_tokens=500, use_openai=use_openai)
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
