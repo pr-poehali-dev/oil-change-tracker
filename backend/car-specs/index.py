@@ -1,6 +1,7 @@
 import json
 import os
 import urllib.request
+from engines_db import ENGINES_DB
 
 
 def handler(event: dict, context) -> dict:
@@ -26,8 +27,6 @@ def handler(event: dict, context) -> dict:
     deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
     openai_key = os.environ.get('OPENAI_API_KEY', '')
     api_key = deepseek_key or openai_key
-    if not api_key:
-        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'API key не задан'})}
     use_openai = not bool(deepseek_key)
 
     generation = body.get('generation', '').strip()
@@ -36,10 +35,20 @@ def handler(event: dict, context) -> dict:
     eng = f", двиг. {engine}" if engine else ""
 
     if mode == 'engines':
-        prompt = f'Engines for {car}. JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} Up to 12 variants. Include engine code, volume, fuel, power. Russian fuel names.'
+        local = _find_local_engines(brand, model)
+        if local:
+            print(f"Local DB hit: {brand} {model} -> {len(local)} engines")
+            return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': local}, ensure_ascii=False)}
 
+        if not api_key:
+            return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': []}, ensure_ascii=False)}
+
+        prompt = f'Engines for {car}. JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} Up to 12 variants. Include engine code, volume, fuel, power. Russian fuel names.'
         result = _call_ai(api_key, prompt, max_tokens=600, use_openai=use_openai)
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
+
+    if not api_key:
+        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'API key не задан'})}
 
     if mode == 'filters':
         prompt = f"""Инструкции замены фильтров {car}{eng}. JSON без markdown:
@@ -57,18 +66,29 @@ def handler(event: dict, context) -> dict:
     return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
 
+def _find_local_engines(brand: str, model: str) -> list:
+    b = brand.lower().strip()
+    m = model.lower().strip()
+    brand_data = ENGINES_DB.get(b)
+    if brand_data:
+        engines = brand_data.get(m)
+        if engines:
+            return engines
+    return []
+
+
 def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool = True) -> dict:
     if use_openai:
-        model = 'gpt-4o-mini'
+        ai_model = 'gpt-4o-mini'
         url = 'https://api.openai.com/v1/chat/completions'
         extra = {'response_format': {'type': 'json_object'}}
     else:
-        model = 'deepseek-chat'
+        ai_model = 'deepseek-chat'
         url = 'https://api.deepseek.com/chat/completions'
         extra = {}
 
     payload = json.dumps({
-        'model': model,
+        'model': ai_model,
         'messages': [
             {'role': 'system', 'content': 'Reply with valid JSON only. No markdown. No explanation.'},
             {'role': 'user', 'content': prompt}
@@ -79,21 +99,11 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
         **extra,
     }).encode('utf-8')
 
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-        },
-        method='POST'
-    )
-
     data = None
     for attempt in range(2):
         try:
             r = urllib.request.Request(url, data=payload, headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}, method='POST')
-            with urllib.request.urlopen(r, timeout=12) as resp:
+            with urllib.request.urlopen(r, timeout=15) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
             break
         except Exception as e:

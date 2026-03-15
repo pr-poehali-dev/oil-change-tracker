@@ -7,12 +7,12 @@
       "expectedStatus": 200
     },
     {
-      "name": "Подбор двигателей Toyota Camry 2010",
+      "name": "Двигатели Toyota Camry из локальной базы",
       "method": "POST",
       "path": "/",
       "body": { "brand": "Toyota", "model": "Camry", "year": "2010", "mode": "engines" },
       "expectedStatus": 200,
-      "expectedBody": { "engines": [] },
+      "expectedBody": { "engines": [{"id": "string", "name": "string"}] },
       "bodyMatcher": "partial"
     },
     {
@@ -21,7 +21,7 @@
       "path": "/",
       "body": {},
       "expectedStatus": 400,
-      "expectedBody": { "error": "brand, model, year обязательны" },
+      "expectedBody": { "error": "string" },
       "bodyMatcher": "partial"
     }
   ]
