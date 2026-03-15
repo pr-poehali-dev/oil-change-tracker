@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
-import { useToast } from '@/hooks/use-toast';
-import { addToCart, getCart, getCartCount } from '@/lib/cart';
+import { getCart, getCartCount } from '@/lib/cart';
+import ProductGallery from '@/components/product/ProductGallery';
+import ProductInfo from '@/components/product/ProductInfo';
+import ProductTabs from '@/components/product/ProductTabs';
 
 interface ProductDetails {
   id: number;
@@ -384,9 +383,6 @@ const productsData: ProductDetails[] = [
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [showScrollArrow, setShowScrollArrow] = useState(true);
 
@@ -402,7 +398,7 @@ export default function ProductDetail() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  
+
   const product = productsData.find(p => p.id === Number(id));
 
   if (!product) {
@@ -416,284 +412,66 @@ export default function ProductDetail() {
     );
   }
 
-  const handleOrder = () => {
-    navigate('/', { state: { scrollTo: 'purchase', productId: product.id } });
-  };
-
   return (
     <>
-    {showScrollArrow && (
-      <div
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-1 cursor-pointer select-none"
-        onClick={() => window.scrollBy({ top: 300, behavior: 'smooth' })}
-      >
-        <span className="text-2xl md:text-4xl font-bold text-primary tracking-widest uppercase">листай вниз</span>
-        <div className="animate-bounce">
-          <Icon name="ChevronDown" size={128} className="text-primary drop-shadow-lg" />
-        </div>
-      </div>
-    )}
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => navigate('/', { state: { scrollTo: 'catalog' } })}>
-              <Icon name="ArrowLeft" size={20} className="mr-2" />
-              Назад в каталог
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={() => navigate('/cart')}
-            >
-              <Icon name="ShoppingCart" size={24} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-3 md:px-4 py-4 md:py-12">
-        <div className="grid lg:grid-cols-2 gap-4 md:gap-12 mb-8 md:mb-12">
-          <div className="space-y-3">
-            <div 
-              className="aspect-[4/3] md:aspect-square overflow-hidden rounded-lg bg-gray-100 relative group cursor-pointer"
-              onClick={() => setIsFullscreen(true)}
-            >
-              <img 
-                src={product.images[selectedImageIndex]} 
-                alt={product.name} 
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                <Icon name="Maximize2" size={48} className="text-white opacity-0 group-hover:opacity-70 transition-opacity" />
-              </div>
-              {product.images.length > 1 && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm"
-                    onClick={() => setSelectedImageIndex(prev => prev === 0 ? product.images.length - 1 : prev - 1)}
-                  >
-                    <Icon name="ChevronLeft" size={24} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm"
-                    onClick={() => setSelectedImageIndex(prev => prev === product.images.length - 1 ? 0 : prev + 1)}
-                  >
-                    <Icon name="ChevronRight" size={24} />
-                  </Button>
-                </>
-              )}
-            </div>
-            {product.images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-4 md:gap-3">
-                {product.images.map((img, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImageIndex(index)}
-                    className={`flex-shrink-0 w-16 h-16 md:w-auto md:h-auto md:aspect-square overflow-hidden rounded-lg border-2 transition-all ${
-                      selectedImageIndex === index 
-                        ? 'border-primary shadow-lg' 
-                        : 'border-transparent hover:border-gray-300'
-                    }`}
-                  >
-                    <img 
-                      src={img} 
-                      alt={`${product.name} ${index + 1}`} 
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4 md:space-y-6">
-            <div>
-              <div className="flex gap-2 mb-3 md:mb-4">
-                <Badge className="bg-primary text-white">В наличии</Badge>
-                {product.oldPrice && <Badge className="bg-red-500 text-white">АКЦИЯ</Badge>}
-              </div>
-              <h1 className="text-2xl md:text-4xl font-display font-bold mb-3">{product.name}</h1>
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`text-2xl md:text-4xl font-bold ${product.oldPrice ? 'text-red-600' : 'text-primary'}`}>
-                  {product.pricePrefix && <span className="text-xl md:text-2xl mr-2">{product.pricePrefix}</span>}
-                  {product.price.toLocaleString('ru-RU')} ₽
-                </div>
-                {product.oldPrice && (
-                  <div className="text-lg md:text-2xl text-gray-400 line-through">
-                    {product.oldPrice.toLocaleString('ru-RU')} ₽
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                <span className="text-gray-600">
-                  {(product.id === 5 || product.id === 7 || product.id === 9) ? 'Интенсивность света:' : 'Увеличение:'}
-                </span>
-                <Badge variant="secondary" className="text-lg">{product.magnification}</Badge>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-4 md:pt-6">
-              <Button 
-                size="lg" 
-                className="w-full bg-primary hover:bg-primary/90"
-                onClick={() => {
-                  addToCart({
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    image: product.images[0]
-                  });
-                  setCartCount(getCartCount(getCart()));
-                  toast({
-                    title: "Добавлено в корзину",
-                    description: `${product.name} добавлен в корзину`,
-                  });
-                }}
-              >
-                <Icon name="ShoppingCart" size={20} className="mr-2" />
-                Добавить в корзину
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="w-full"
-                onClick={() => navigate('/', { state: { scrollTo: 'testdrive' } })}
-              >
-                <Icon name="Calendar" size={20} className="mr-2" />
-                Записаться на тест-драйв
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 md:gap-4 pt-4 md:pt-6 border-t">
-              <div className="text-center">
-                <Icon name="Shield" size={24} className="mx-auto mb-2 text-primary" />
-                <p className="text-sm text-gray-400">Гарантия качества</p>
-              </div>
-              <div className="text-center">
-                <Icon name="Truck" size={24} className="mx-auto mb-2 text-primary" />
-                <p className="text-sm text-gray-400">Доставка по РФ</p>
-              </div>
-              <div className="text-center">
-                <Icon name="Wrench" size={24} className="mx-auto mb-2 text-primary" />
-                <p className="text-sm text-gray-400">Сервисное обслуживание</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Tabs defaultValue="description" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="description">Описание</TabsTrigger>
-            <TabsTrigger value="specifications">Характеристики</TabsTrigger>
-            <TabsTrigger value="package">Комплектация</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="description" className="mt-6">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-lg text-gray-300">{product.fullDescription}</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="specifications" className="mt-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-3">
-                  {product.specifications.map((spec, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center justify-between p-4 bg-muted/30 rounded-lg"
-                    >
-                      <span className="font-medium text-gray-400">{spec.label}</span>
-                      <span className="font-semibold">{spec.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="package" className="mt-6">
-            <Card>
-              <CardContent className="pt-6">
-                <ul className="space-y-3">
-                  {product.package.map((item, index) => (
-                    <li key={index} className="flex items-start">
-                      <Icon name="CheckCircle" size={20} className="text-primary mr-3 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-300">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-
-    {isFullscreen && (
-      <div 
-        className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4"
-        onClick={() => setIsFullscreen(false)}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 right-4 text-white hover:bg-white/20"
-          onClick={() => setIsFullscreen(false)}
+      {showScrollArrow && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-1 cursor-pointer select-none"
+          onClick={() => window.scrollBy({ top: 300, behavior: 'smooth' })}
         >
-          <Icon name="X" size={32} />
-        </Button>
-        
-        <div className="relative max-w-7xl max-h-full" onClick={(e) => e.stopPropagation()}>
-          <img 
-            src={product.images[selectedImageIndex]} 
-            alt={product.name} 
-            className="max-w-full max-h-[90vh] object-contain"
+          <span className="text-2xl md:text-4xl font-bold text-primary tracking-widest uppercase">листай вниз</span>
+          <div className="animate-bounce">
+            <Icon name="ChevronDown" size={128} className="text-primary drop-shadow-lg" />
+          </div>
+        </div>
+      )}
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" onClick={() => navigate('/', { state: { scrollTo: 'catalog' } })}>
+                <Icon name="ArrowLeft" size={20} className="mr-2" />
+                Назад в каталог
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                onClick={() => navigate('/cart')}
+              >
+                <Icon name="ShoppingCart" size={24} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <div className="container mx-auto px-3 md:px-4 py-4 md:py-12">
+          <div className="grid lg:grid-cols-2 gap-4 md:gap-12 mb-8 md:mb-12">
+            <ProductGallery images={product.images} productName={product.name} />
+            <ProductInfo
+              id={product.id}
+              name={product.name}
+              price={product.price}
+              oldPrice={product.oldPrice}
+              pricePrefix={product.pricePrefix}
+              magnification={product.magnification}
+              images={product.images}
+              onCartCountChange={setCartCount}
+            />
+          </div>
+
+          <ProductTabs
+            fullDescription={product.fullDescription}
+            specifications={product.specifications}
+            package={product.package}
           />
-          
-          {product.images.length > 1 && (
-            <>
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm"
-                onClick={() => setSelectedImageIndex(prev => prev === 0 ? product.images.length - 1 : prev - 1)}
-              >
-                <Icon name="ChevronLeft" size={24} />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm"
-                onClick={() => setSelectedImageIndex(prev => prev === product.images.length - 1 ? 0 : prev + 1)}
-              >
-                <Icon name="ChevronRight" size={24} />
-              </Button>
-            </>
-          )}
         </div>
       </div>
-    )}
     </>
   );
 }

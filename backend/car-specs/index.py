@@ -4,35 +4,8 @@ import urllib.request
 import urllib.parse
 
 def _search_filter_image(query):
-    """Ищет фото фильтра через DuckDuckGo Images и возвращает URL первой картинки."""
+    """Возвращает URL фото фильтра через Unsplash source."""
     encoded_q = urllib.parse.quote(query)
-    try:
-        vqd_url = "https://duckduckgo.com/?q=" + encoded_q + "&ia=images"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        req = urllib.request.Request(vqd_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=8) as r:
-            html = r.read().decode("utf-8", errors="ignore")
-        vqd = ""
-        marker = "vqd="
-        idx = html.find(marker)
-        if idx != -1:
-            rest = html[idx + len(marker):]
-            if rest.startswith('"'):
-                vqd = rest[1:rest.index('"', 1)]
-            elif rest.startswith("'"):
-                vqd = rest[1:rest.index("'", 1)]
-            else:
-                vqd = rest.split("&")[0].split('"')[0].split("'")[0][:30]
-        if vqd:
-            img_url = "https://duckduckgo.com/i.js?q=" + encoded_q + "&vqd=" + vqd + "&o=json"
-            req2 = urllib.request.Request(img_url, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://duckduckgo.com/"})
-            with urllib.request.urlopen(req2, timeout=8) as r2:
-                data = json.loads(r2.read().decode("utf-8"))
-            results = data.get("results", [])
-            if results:
-                return results[0].get("image", "")
-    except Exception:
-        pass
     return "https://source.unsplash.com/400x300/?" + encoded_q
 
 
@@ -157,7 +130,7 @@ def handler(event: dict, context) -> dict:
 - steps: 3-5 детальных шагов с конкретными действиями для данного авто
 - Укажи расположение фильтра, нужные инструменты, момент затяжки где нужно"""
 
-        result = _call_deepseek(api_key, prompt, max_tokens=3000)
+        result = _call_deepseek(api_key, prompt, max_tokens=2000)
 
         # Добавляем фото к каждому фильтру
         filters = result.get('filters', [])
@@ -257,7 +230,7 @@ def _call_deepseek(api_key: str, prompt: str, max_tokens: int = 2000) -> dict:
         method='POST'
     )
 
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=25) as resp:
         data = json.loads(resp.read().decode('utf-8'))
 
     content = data['choices'][0]['message']['content'].strip()
