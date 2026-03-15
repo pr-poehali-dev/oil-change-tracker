@@ -109,20 +109,6 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setFromDb(false);
     setDbCarId(null);
     try {
-      // Сначала ищем авто в базе данных
-      const dbResult = await apiSearchCar(brand.trim(), model.trim(), year.trim());
-      if (dbResult.found) {
-        setFromDb(true);
-        setDbCarId(dbResult.id);
-        if (dbResult.oilInterval) setInterval(String(dbResult.oilInterval));
-        if (dbResult.guides?.length) setAiGuides(dbResult.guides);
-        if (dbResult.specs?.length) setAiSpecs(dbResult.specs);
-        setSpecsLoaded(true);
-        setEnginesLoaded(true);
-        setEnginesLoading(false);
-        return;
-      }
-      // Не найдено в БД — идём в DeepSeek
       const res = await fetch(CAR_SPECS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
