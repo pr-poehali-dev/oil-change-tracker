@@ -60,8 +60,8 @@ export default function Index() {
   const [activeGuide, setActiveGuide] = useState<string | null>(null);
   const [openStep, setOpenStep] = useState<number | null>(null);
 
-  const remaining = Math.max(0, OIL_INTERVAL - totalKm);
-  const progress = Math.min(1, totalKm / OIL_INTERVAL);
+  const remaining = OIL_INTERVAL > 0 ? Math.max(0, OIL_INTERVAL - totalKm) : 0;
+  const progress = OIL_INTERVAL > 0 ? Math.min(1, totalKm / OIL_INTERVAL) : 0;
   const urgency = progress >= 1 ? "danger" : progress >= 0.8 ? "warn" : "ok";
 
   // Загрузка кастомных авто из БД
