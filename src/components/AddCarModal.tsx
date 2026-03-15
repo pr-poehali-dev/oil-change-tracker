@@ -143,11 +143,24 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setSpecsLoading(true);
     setSpecsError("");
     setSpecsLoaded(false);
+    setFromDb(false);
+    setDbCarId(null);
     try {
+      // Ищем в БД с учётом движка
+      const dbResult = await apiSearchCar(brand.trim(), model.trim(), year.trim());
+      if (dbResult.found) {
+        setFromDb(true);
+        setDbCarId(dbResult.id);
+        if (dbResult.oilInterval) setInterval(String(dbResult.oilInterval));
+        if (dbResult.guides?.length) setAiGuides(dbResult.guides);
+        if (dbResult.specs?.length) setAiSpecs(dbResult.specs);
+        setSpecsLoaded(true);
+        return;
+      }
+      // Нет в БД — идём в DeepSeek
       const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim() };
       const engineName = engine?.name;
       const body = engineName ? { ...baseBody, engine: engineName } : baseBody;
-
       const res = await fetch(CAR_SPECS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,8 +169,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       const specsData = await res.json();
       if (!res.ok) throw new Error(specsData.error || "Ошибка сервера");
       if (specsData.oilInterval) setInterval(String(specsData.oilInterval));
-      const oilGuides: CarConfig["guides"] = specsData.guides || [];
-      setAiGuides(oilGuides);
+      setAiGuides(specsData.guides || []);
       if (specsData.specs?.length) setAiSpecs(specsData.specs);
       setSpecsLoaded(true);
     } catch (e: unknown) {
