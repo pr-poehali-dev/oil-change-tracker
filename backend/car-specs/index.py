@@ -29,9 +29,9 @@ def handler(event: dict, context) -> dict:
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
-    api_key = os.environ.get('DEEPSEEK_API_KEY', '')
+    api_key = os.environ.get('OPENAI_API_KEY', '')
     if not api_key:
-        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'DEEPSEEK_API_KEY не задан'})}
+        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'OPENAI_API_KEY не задан'})}
 
     # Режим 1: подбор двигателей
     if mode == 'engines':
@@ -195,7 +195,7 @@ def handler(event: dict, context) -> dict:
 
 def _call_deepseek(api_key: str, prompt: str, max_tokens: int = 2000) -> dict:
     payload = json.dumps({
-        'model': 'deepseek-chat',
+        'model': 'gpt-4o-mini',
         'messages': [
             {'role': 'system', 'content': 'Ты отвечаешь только валидным JSON без markdown-обёртки.'},
             {'role': 'user', 'content': prompt}
@@ -205,7 +205,7 @@ def _call_deepseek(api_key: str, prompt: str, max_tokens: int = 2000) -> dict:
     }).encode('utf-8')
 
     req = urllib.request.Request(
-        'https://api.deepseek.com/chat/completions',
+        'https://api.openai.com/v1/chat/completions',
         data=payload,
         headers={
             'Authorization': f'Bearer {api_key}',
