@@ -26,8 +26,15 @@ def handler(event: dict, context) -> dict:
 
     deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
     openai_key = os.environ.get('OPENAI_API_KEY', '')
-    api_key = deepseek_key or openai_key
-    use_openai = not bool(deepseek_key)
+    if openai_key:
+        api_key = openai_key
+        use_openai = True
+    elif deepseek_key:
+        api_key = deepseek_key
+        use_openai = False
+    else:
+        api_key = ''
+        use_openai = True
 
     generation = body.get('generation', '').strip()
     car = f"{brand} {model} {year}" + (f" ({generation})" if generation else "")
@@ -100,14 +107,12 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
     }).encode('utf-8')
 
     data = None
-    for attempt in range(2):
-        try:
-            r = urllib.request.Request(url, data=payload, headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}, method='POST')
-            with urllib.request.urlopen(r, timeout=15) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-            break
-        except Exception as e:
-            print(f"AI attempt {attempt+1} failed: {e}")
+    try:
+        r = urllib.request.Request(url, data=payload, headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}, method='POST')
+        with urllib.request.urlopen(r, timeout=25) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        print(f"AI call failed: {e}")
     if data is None:
         return _fallback(prompt)
 
