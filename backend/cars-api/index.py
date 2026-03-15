@@ -1,6 +1,7 @@
 """
 REST API для управления автомобилями пользователя.
 Методы: GET / — список, POST / — создать, PUT /{id} — обновить, DELETE /{id} — удалить.
+GET /search?brand=X&model=Y&year=Z — поиск авто в БД.
 Также: GET /entries/{car_id} — история км, POST /entries — добавить запись км.
 """
 import json
@@ -41,6 +42,9 @@ def handler(event: dict, context) -> dict:
 
     if '/specs' in path:
         return handle_specs(method, path, event)
+
+    if '/search' in path and method == 'GET':
+        return handle_search(event)
 
     # /  — список всех авто
     if method == 'GET':
@@ -191,6 +195,40 @@ def handle_entries(method, path, event):
         return resp(200, {'ok': True})
 
     return resp(405, {'error': 'Method not allowed'})
+
+
+def handle_search(event):
+    """Поиск авто в БД по brand, model, year (нечёткий, без учёта регистра)."""
+    params = event.get('queryStringParameters') or {}
+    brand = params.get('brand', '').strip().lower()
+    model = params.get('model', '').strip().lower()
+    year = params.get('year', '').strip()
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT c.id, c.brand, c.model, c.year, c.oil_interval, c.guides, c.custom,
+               cs.specs
+        FROM cars c
+        LEFT JOIN car_specs cs ON cs.car_id = c.id
+        WHERE LOWER(c.brand) = %s AND LOWER(c.model) = %s AND c.year = %s
+        LIMIT 1
+    """, (brand, model, year))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return resp(404, {'found': False})
+    car = {
+        'found': True,
+        'id': row[0],
+        'brand': row[1],
+        'model': row[2],
+        'year': row[3],
+        'oilInterval': row[4],
+        'guides': row[5] if row[5] is not None else [],
+        'custom': row[6],
+        'specs': row[7] if row[7] is not None else [],
+    }
+    return resp(200, car)
 
 
 def handle_specs(method, path, event):

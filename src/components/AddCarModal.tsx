@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { CarConfig, ManualGuide, ManualStep, generateCarId } from "@/lib/cars";
+import { apiSearchCar } from "@/api";
 
 const CAR_BRANDS = [
   "Acura","Alfa Romeo","Aston Martin","Audi","Bentley","BMW","Bugatti","Buick",
@@ -49,6 +50,8 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   const [specsError, setSpecsError] = useState("");
   const [aiGuides, setAiGuides] = useState<CarConfig["guides"]>([]);
   const [aiSpecs, setAiSpecs] = useState<[string, string][]>([]);
+  const [fromDb, setFromDb] = useState(false);
+  const [dbCarId, setDbCarId] = useState<string | null>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -91,6 +94,8 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setAiSpecs([]);
     setAiGuides([]);
     setInterval("");
+    setFromDb(false);
+    setDbCarId(null);
   }
 
   async function handleFetchEngines() {
@@ -101,7 +106,23 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setSpecsLoaded(false);
     setAiSpecs([]);
     setAiGuides([]);
+    setFromDb(false);
+    setDbCarId(null);
     try {
+      // Сначала ищем авто в базе данных
+      const dbResult = await apiSearchCar(brand.trim(), model.trim(), year.trim());
+      if (dbResult.found) {
+        setFromDb(true);
+        setDbCarId(dbResult.id);
+        if (dbResult.oilInterval) setInterval(String(dbResult.oilInterval));
+        if (dbResult.guides?.length) setAiGuides(dbResult.guides);
+        if (dbResult.specs?.length) setAiSpecs(dbResult.specs);
+        setSpecsLoaded(true);
+        setEnginesLoaded(true);
+        setEnginesLoading(false);
+        return;
+      }
+      // Не найдено в БД — идём в DeepSeek
       const res = await fetch(CAR_SPECS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,7 +198,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
 
   function handleSubmit() {
     if (!brand.trim() || !model.trim() || !year.trim() || !interval.trim()) return;
-    const id = generateCarId(brand, model, year);
+    const id = dbCarId ?? generateCarId(brand, model, year);
     const car: CarConfig = {
       id,
       brand: brand.trim(),
@@ -190,7 +211,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     };
     onAdd(car, aiSpecs.length ? aiSpecs : undefined);
     onClose();
-    fetchFiltersInBackground(id, selectedEngine?.name);
+    if (!fromDb) fetchFiltersInBackground(id, selectedEngine?.name);
   }
 
   return (
@@ -284,6 +305,13 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
 
           {enginesError && (
             <p className="text-xs text-red-500 text-center">{enginesError}</p>
+          )}
+
+          {fromDb && enginesLoaded && (
+            <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-2.5">
+              <Icon name="Database" size={14} className="text-green-500 shrink-0" />
+              <p className="text-xs text-green-600 font-golos">Данные загружены из базы</p>
+            </div>
           )}
 
           {enginesLoaded && engines.length > 0 && (

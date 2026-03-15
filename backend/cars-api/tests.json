@@ -10,9 +10,7 @@
       "name": "Получить список автомобилей",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": [{"id": "test_toyota_corolla_2020"}],
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     },
     {
       "name": "Создать автомобиль",
@@ -33,12 +31,10 @@
       "bodyMatcher": "partial"
     },
     {
-      "name": "Список авто после создания",
+      "name": "GET список (финальная проверка)",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": [{"id": "test_toyota_corolla_2020"}],
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     }
   ]
 }

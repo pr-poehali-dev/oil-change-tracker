@@ -3,7 +3,7 @@ import Icon from "@/components/ui/icon";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
   CarConfig, ManualGuide,
-  DEFAULT_CARS, DEFAULT_SPECS,
+  DEFAULT_SPECS,
 } from "@/lib/cars";
 import {
   apiGetCars, apiCreateCar, apiDeleteCar, apiUpdateCar,
@@ -16,7 +16,7 @@ type DayEntry = { date: string; km: number };
 
 function selectedCarKey() { return "selected_car_id"; }
 function loadSelectedCarId(): string {
-  return localStorage.getItem(selectedCarKey()) || DEFAULT_CARS[0].id;
+  return localStorage.getItem(selectedCarKey()) || "";
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────
@@ -35,7 +35,7 @@ export default function Index() {
   const [customCars, setCustomCars] = useState<CarConfig[]>([]);
   const [customSpecs, setCustomSpecs] = useState<Record<string, [string, string][]>>({});
   const [carsLoaded, setCarsLoaded] = useState(false);
-  const allCars = [...DEFAULT_CARS, ...customCars];
+  const allCars = customCars;
 
   const [selectedCarId, setSelectedCarId] = useState<string>(loadSelectedCarId);
 
@@ -45,8 +45,8 @@ export default function Index() {
   const [confirmDeleteCar, setConfirmDeleteCar] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const car = allCars.find((c) => c.id === selectedCarId) ?? DEFAULT_CARS[0];
-  const OIL_INTERVAL = car.oilInterval;
+  const car = allCars.find((c) => c.id === selectedCarId) ?? allCars[0] ?? null;
+  const OIL_INTERVAL = car?.oilInterval ?? 0;
 
   const [tab, setTab] = useState<"counter" | "calendar" | "instructions">("counter");
   const [dailyInput, setDailyInput] = useState("");
@@ -77,40 +77,26 @@ export default function Index() {
 
   // Загрузка записей пробега при смене авто
   const loadEntriesForCar = useCallback((carId: string) => {
-    const isDefault = DEFAULT_CARS.some((c) => c.id === carId);
-    if (isDefault) {
-      const saved = localStorage.getItem(`oil_entries_${carId}`);
-      const savedTotal = localStorage.getItem(`oil_total_${carId}`);
-      setEntries(saved ? JSON.parse(saved) : []);
-      setTotalKm(savedTotal ? Number(savedTotal) : 0);
-    } else {
-      apiGetEntries(carId).then((data: DayEntry[]) => {
-        setEntries(data);
-        setTotalKm(data.reduce((s, e) => +(s + e.km).toFixed(1), 0));
-      }).catch(() => { setEntries([]); setTotalKm(0); });
-    }
+    apiGetEntries(carId).then((data: DayEntry[]) => {
+      setEntries(data);
+      setTotalKm(data.reduce((s, e) => +(s + e.km).toFixed(1), 0));
+    }).catch(() => { setEntries([]); setTotalKm(0); });
   }, []);
 
   // Переключение автомобиля
   useEffect(() => {
+    if (!selectedCarId) return;
     localStorage.setItem(selectedCarKey(), selectedCarId);
     setActiveGuide(null);
     setOpenStep(null);
-    if (carsLoaded || DEFAULT_CARS.some((c) => c.id === selectedCarId)) {
+    if (carsLoaded) {
       loadEntriesForCar(selectedCarId);
     }
   }, [selectedCarId, carsLoaded, loadEntriesForCar]);
 
-  // Сохранение km для встроенных авто в localStorage
-  useEffect(() => {
-    if (DEFAULT_CARS.some((c) => c.id === car.id)) {
-      localStorage.setItem(`oil_entries_${car.id}`, JSON.stringify(entries));
-      localStorage.setItem(`oil_total_${car.id}`, String(totalKm));
-    }
-  }, [entries, totalKm, car.id]);
-
   // Локальные уведомления
   useEffect(() => {
+    if (!car) return;
     const carName = `${car.brand} ${car.model}`;
     const prev = getScheduledRemaining();
     if (remaining < 300) {
@@ -151,9 +137,7 @@ export default function Index() {
     setEntries(newEntries);
     setTotalKm(newTotal);
     setDailyInput("");
-    if (!DEFAULT_CARS.some((c) => c.id === car.id)) {
-      apiSaveEntry(car.id, today, newKm).catch(() => {});
-    }
+    if (car) apiSaveEntry(car.id, today, newKm).catch(() => {});
     if (newTotal >= OIL_INTERVAL) {
       showNotif("Пора менять масло! Пробег достигнут.");
     } else if (newTotal >= OIL_INTERVAL * 0.8) {
@@ -162,10 +146,9 @@ export default function Index() {
   }
 
   async function handleReset() {
-    if (!DEFAULT_CARS.some((c) => c.id === car.id)) {
-      for (const e of entries) {
-        await fetch(`https://functions.poehali.dev/569f47e9-9c87-4e78-aac2-72676d772a07/entries/${car.id}/${e.date}`, { method: "DELETE" }).catch(() => {});
-      }
+    if (!car) return;
+    for (const e of entries) {
+      await fetch(`https://functions.poehali.dev/569f47e9-9c87-4e78-aac2-72676d772a07/entries/${car.id}/${e.date}`, { method: "DELETE" }).catch(() => {});
     }
     setEntries([]);
     setTotalKm(0);
@@ -184,11 +167,13 @@ export default function Index() {
   }
 
   async function handleDeleteCar() {
+    if (!car) return;
     const id = car.id;
     await apiDeleteCar(id).catch(() => {});
-    setCustomCars((prev) => prev.filter((c) => c.id !== id));
+    const remaining = customCars.filter((c) => c.id !== id);
+    setCustomCars(remaining);
     setCustomSpecs((prev) => { const s = { ...prev }; delete s[id]; return s; });
-    setSelectedCarId(DEFAULT_CARS[0].id);
+    setSelectedCarId(remaining[0]?.id ?? "");
     setConfirmDeleteCar(false);
     showNotif("Автомобиль удалён");
   }
@@ -208,6 +193,7 @@ export default function Index() {
   }
 
   async function handleAddGuide(guide: ManualGuide) {
+    if (!car) return;
     const updatedGuides = [...car.guides, guide];
     setCustomCars((prev) =>
       prev.map((c) => c.id === car.id ? { ...c, guides: updatedGuides } : c)
@@ -218,6 +204,7 @@ export default function Index() {
   }
 
   async function handleDeleteGuide(guideId: string) {
+    if (!car) return;
     const updatedGuides = car.guides.filter((g) => g.id !== guideId);
     setCustomCars((prev) =>
       prev.map((c) => c.id === car.id ? { ...c, guides: updatedGuides } : c)
@@ -231,7 +218,7 @@ export default function Index() {
   const [filtersRefreshing, setFiltersRefreshing] = useState(false);
 
   async function handleRefreshFilters() {
-    if (!car.custom || filtersRefreshing) return;
+    if (!car?.custom || filtersRefreshing) return;
     setFiltersRefreshing(true);
     try {
       const baseBody = { brand: car.brand, model: car.model, year: car.year, ...(car.engine ? { engine: car.engine } : {}) };
@@ -274,9 +261,9 @@ export default function Index() {
   const firstDay = getFirstDayOfMonth(calYear, calMonth);
   const entryMap = Object.fromEntries(entries.map((e) => [e.date, e.km]));
 
-  const guide = car.guides.find((g) => g.id === activeGuide) ?? null;
+  const guide = car?.guides.find((g) => g.id === activeGuide) ?? null;
   const allSpecs = { ...DEFAULT_SPECS, ...customSpecs };
-  const specs = allSpecs[car.id] ?? [];
+  const specs = car ? (allSpecs[car.id] ?? []) : [];
 
   const TABS = [
     { id: "counter", label: "Счётчик" },
@@ -295,6 +282,15 @@ export default function Index() {
 
       {/* Car selector dropdown */}
       <div className="px-6 max-w-md mx-auto w-full mb-3" ref={dropdownRef}>
+        {!car ? (
+          <button
+            onClick={() => setShowAddCar(true)}
+            className="w-full bg-card border border-dashed border-border rounded-2xl px-4 py-4 flex items-center gap-3 hover:border-muted-foreground transition-colors"
+          >
+            <Icon name="Plus" size={16} className="text-muted-foreground" />
+            <span className="font-golos text-sm text-muted-foreground">Добавить первый автомобиль</span>
+          </button>
+        ) : (
         <button
           onClick={() => setCarDropdownOpen((v) => !v)}
           className="w-full bg-card border border-border rounded-2xl px-4 py-3 flex items-center justify-between hover:border-muted-foreground transition-colors"
@@ -314,6 +310,7 @@ export default function Index() {
             />
           </div>
         </button>
+        )}
 
         {carDropdownOpen && (
           <div className="absolute z-40 mt-1 w-[calc(100%-3rem)] max-w-md bg-card border border-border rounded-2xl shadow-xl overflow-hidden animate-fade-in">
@@ -346,7 +343,7 @@ export default function Index() {
       </div>
 
       {/* Tabs */}
-      <div className="px-6 max-w-md mx-auto w-full">
+      <div className={`px-6 max-w-md mx-auto w-full${!car ? " hidden" : ""}`}>
         <div className="flex gap-1 bg-secondary rounded-xl p-1">
           {TABS.map((t) => (
             <button
@@ -406,7 +403,7 @@ export default function Index() {
       {showAddCar && <AddCarModal onAdd={handleAddCar} onFiltersReady={handleFiltersReady} onClose={() => setShowAddCar(false)} />}
       {showAddGuide && <AddGuideModal onAdd={handleAddGuide} onClose={() => setShowAddGuide(false)} />}
 
-      <main className="flex-1 px-6 pt-5 pb-10 max-w-md mx-auto w-full">
+      <main className={`flex-1 px-6 pt-5 pb-10 max-w-md mx-auto w-full${!car ? " hidden" : ""}`}>
 
         {/* ── СЧЁТЧИК ── */}
         {tab === "counter" && (
