@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { CarConfig, ManualStep, generateCarId } from "@/lib/cars";
+import { CarConfig, ManualGuide, ManualStep, generateCarId } from "@/lib/cars";
 
 const CAR_SPECS_URL = "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23";
 
@@ -14,10 +14,11 @@ type Engine = {
 
 type Props = {
   onAdd: (car: CarConfig, specs?: [string, string][]) => void;
+  onFiltersReady?: (carId: string, guides: ManualGuide[]) => void;
   onClose: () => void;
 };
 
-export default function AddCarModal({ onAdd, onClose }: Props) {
+export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
@@ -35,9 +36,6 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
   const [aiGuides, setAiGuides] = useState<CarConfig["guides"]>([]);
   const [aiSpecs, setAiSpecs] = useState<[string, string][]>([]);
 
-  const [filtersLoading, setFiltersLoading] = useState(false);
-  const [filtersLoaded, setFiltersLoaded] = useState(false);
-
   const canFetchEngines = brand.trim().length > 0 && model.trim().length > 0 && year.trim().length === 4;
 
   function resetOnCarChange() {
@@ -48,8 +46,6 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
     setAiSpecs([]);
     setAiGuides([]);
     setInterval("");
-    setFiltersLoading(false);
-    setFiltersLoaded(false);
   }
 
   async function handleFetchEngines() {
@@ -81,31 +77,46 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
     setSpecsLoading(true);
     setSpecsError("");
     setSpecsLoaded(false);
-    setFiltersLoading(true);
-    setFiltersLoaded(false);
     try {
       const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim() };
       const engineName = engine?.name;
+      const body = engineName ? { ...baseBody, engine: engineName } : baseBody;
 
-      const [specsRes, filtersRes] = await Promise.all([
-        fetch(CAR_SPECS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(engineName ? { ...baseBody, engine: engineName } : baseBody),
-        }),
-        fetch(CAR_SPECS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(engineName ? { ...baseBody, engine: engineName, mode: "filters" } : { ...baseBody, mode: "filters" }),
-        }),
-      ]);
-
-      const specsData = await specsRes.json();
-      if (!specsRes.ok) throw new Error(specsData.error || "Ошибка сервера");
+      const res = await fetch(CAR_SPECS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const specsData = await res.json();
+      if (!res.ok) throw new Error(specsData.error || "Ошибка сервера");
       if (specsData.oilInterval) setInterval(String(specsData.oilInterval));
+      const oilGuides: CarConfig["guides"] = specsData.guides || [];
+      setAiGuides(oilGuides);
+      if (specsData.specs?.length) setAiSpecs(specsData.specs);
+      setSpecsLoaded(true);
+    } catch (e: unknown) {
+      setSpecsError(e instanceof Error ? e.message : "Не удалось получить данные");
+    } finally {
+      setSpecsLoading(false);
+    }
+  }
 
-      const filtersData = await filtersRes.json();
-      const filterGuides: CarConfig["guides"] = (filtersData.filters || []).map((f: { id: string; title: string; icon: string; steps: ManualStep[]; article?: string; interval?: string }) => ({
+  function handleSelectEngine(engine: Engine) {
+    setSelectedEngine(engine);
+    handleFetchSpecs(engine);
+  }
+
+  async function fetchFiltersInBackground(carId: string, engineName?: string) {
+    try {
+      const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim() };
+      const body = engineName ? { ...baseBody, engine: engineName, mode: "filters" } : { ...baseBody, mode: "filters" };
+      const res = await fetch(CAR_SPECS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      const filterGuides: ManualGuide[] = (data.filters || []).map((f: { id: string; title: string; icon: string; steps: ManualStep[]; article?: string; interval?: string }) => ({
         id: f.id,
         title: f.title,
         icon: f.icon,
@@ -113,23 +124,10 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
         article: f.article,
         interval: f.interval,
       }));
-      setFiltersLoaded(true);
-
-      const oilGuides: CarConfig["guides"] = specsData.guides || [];
-      setAiGuides([...oilGuides, ...filterGuides]);
-      if (specsData.specs?.length) setAiSpecs(specsData.specs);
-      setSpecsLoaded(true);
-    } catch (e: unknown) {
-      setSpecsError(e instanceof Error ? e.message : "Не удалось получить данные");
-    } finally {
-      setSpecsLoading(false);
-      setFiltersLoading(false);
-    }
-  }
-
-  function handleSelectEngine(engine: Engine) {
-    setSelectedEngine(engine);
-    handleFetchSpecs(engine);
+      if (filterGuides.length > 0 && onFiltersReady) {
+        onFiltersReady(carId, filterGuides);
+      }
+    } catch (_e) { /* фоновая загрузка — ошибки игнорируем */ }
   }
 
   function handleSubmit() {
@@ -147,6 +145,7 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
     };
     onAdd(car, aiSpecs.length ? aiSpecs : undefined);
     onClose();
+    fetchFiltersInBackground(id, selectedEngine?.name);
   }
 
   return (
@@ -165,7 +164,6 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
         </div>
 
         <div className="space-y-3">
-          {/* Марка, модель, год */}
           <div>
             <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Марка</label>
             <input
@@ -203,7 +201,6 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
             </div>
           </div>
 
-          {/* Шаг 1: кнопка подбора двигателей */}
           {!enginesLoaded && (
             <button
               onClick={handleFetchEngines}
@@ -228,7 +225,6 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
             <p className="text-xs text-red-500 text-center">{enginesError}</p>
           )}
 
-          {/* Список двигателей */}
           {enginesLoaded && engines.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -281,7 +277,6 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
             <p className="text-xs text-red-500 text-center">{specsError}</p>
           )}
 
-          {/* Спецификации */}
           {specsLoaded && aiSpecs.length > 0 && (
             <div className="bg-secondary rounded-2xl p-3 space-y-1">
               {aiSpecs.map(([key, val]) => (
@@ -293,18 +288,11 @@ export default function AddCarModal({ onAdd, onClose }: Props) {
             </div>
           )}
 
-          {/* Статус загрузки фильтров */}
-          {filtersLoading && (
+          {specsLoaded && (
             <div className="flex items-center gap-2 px-1">
-              <Icon name="Loader" size={13} className="animate-spin text-muted-foreground shrink-0" />
-              <p className="text-xs text-muted-foreground font-golos">Подбираю инструкции по фильтрам...</p>
-            </div>
-          )}
-          {filtersLoaded && aiGuides.length > 1 && (
-            <div className="flex items-center gap-2 px-1">
-              <Icon name="CheckCircle" size={13} className="text-green-500 shrink-0" />
+              <Icon name="Info" size={13} className="text-muted-foreground shrink-0" />
               <p className="text-xs text-muted-foreground font-golos">
-                Готово: {aiGuides.length} инструкц{aiGuides.length === 1 ? "ия" : aiGuides.length < 5 ? "ии" : "ий"} по замене масла и фильтров
+                Инструкции по фильтрам подгрузятся после добавления
               </p>
             </div>
           )}

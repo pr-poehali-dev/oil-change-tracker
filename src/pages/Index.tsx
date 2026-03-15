@@ -193,6 +193,20 @@ export default function Index() {
     showNotif("Автомобиль удалён");
   }
 
+  async function handleFiltersReady(carId: string, filterGuides: ManualGuide[]) {
+    setCustomCars((prev) =>
+      prev.map((c) => {
+        if (c.id !== carId) return c;
+        const existingIds = new Set(filterGuides.map((g) => g.id));
+        const kept = c.guides.filter((g) => !existingIds.has(g.id));
+        const updatedGuides = [...kept, ...filterGuides];
+        apiUpdateCar(carId, { guides: updatedGuides }).catch(() => {});
+        return { ...c, guides: updatedGuides };
+      })
+    );
+    showNotif("Инструкции по фильтрам загружены!");
+  }
+
   async function handleAddGuide(guide: ManualGuide) {
     const updatedGuides = [...car.guides, guide];
     setCustomCars((prev) =>
@@ -389,7 +403,7 @@ export default function Index() {
       )}
 
       {/* Modals */}
-      {showAddCar && <AddCarModal onAdd={handleAddCar} onClose={() => setShowAddCar(false)} />}
+      {showAddCar && <AddCarModal onAdd={handleAddCar} onFiltersReady={handleFiltersReady} onClose={() => setShowAddCar(false)} />}
       {showAddGuide && <AddGuideModal onAdd={handleAddGuide} onClose={() => setShowAddGuide(false)} />}
 
       <main className="flex-1 px-6 pt-5 pb-10 max-w-md mx-auto w-full">
