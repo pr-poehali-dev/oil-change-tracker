@@ -89,11 +89,16 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
         method='POST'
     )
 
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-    except Exception as e:
-        print(f"AI call failed: {e}")
+    data = None
+    for attempt in range(2):
+        try:
+            r = urllib.request.Request(url, data=payload, headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(r, timeout=12) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            break
+        except Exception as e:
+            print(f"AI attempt {attempt+1} failed: {e}")
+    if data is None:
         return _fallback(prompt)
 
     content = data['choices'][0]['message']['content'].strip()
