@@ -30,7 +30,8 @@ def handler(event: dict, context) -> dict:
         return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': 'API key не задан'})}
     use_openai = not bool(deepseek_key)
 
-    car = f"{brand} {model} {year}"
+    generation = body.get('generation', '').strip()
+    car = f"{brand} {model} {year}" + (f" ({generation})" if generation else "")
     engine = body.get('engine', '').strip()
     eng = f", двиг. {engine}" if engine else ""
 
