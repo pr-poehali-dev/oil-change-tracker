@@ -323,7 +323,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
                   Сменить
                 </button>
               </div>
-              <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {engines.map((eng) => {
                   const isSelected = selectedEngine?.id === eng.id;
                   return (
@@ -331,21 +331,18 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
                       key={eng.id}
                       onClick={() => handleSelectEngine(eng)}
                       disabled={specsLoading}
-                      className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-golos transition-all flex items-center justify-between gap-2 disabled:opacity-50 ${
+                      className={`text-left px-3 py-1.5 rounded-lg border text-xs font-golos transition-all flex items-center gap-1.5 disabled:opacity-50 ${
                         isSelected
                           ? "border-ring bg-ring/10 text-foreground"
-                          : "border-border bg-secondary text-foreground hover:bg-muted"
+                          : "border-border bg-secondary text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
                       <span>{eng.name}</span>
                       {isSelected && specsLoading && (
-                        <Icon name="Loader" size={13} className="animate-spin text-muted-foreground flex-shrink-0" />
+                        <Icon name="Loader" size={11} className="animate-spin text-muted-foreground flex-shrink-0" />
                       )}
                       {isSelected && specsLoaded && (
-                        <Icon name="CheckCircle" size={13} className="text-green-500 flex-shrink-0" />
-                      )}
-                      {!isSelected && (
-                        <Icon name="ChevronRight" size={13} className="text-muted-foreground flex-shrink-0" />
+                        <Icon name="CheckCircle" size={11} className="text-green-500 flex-shrink-0" />
                       )}
                     </button>
                   );

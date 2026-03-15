@@ -34,9 +34,9 @@ def handler(event: dict, context) -> dict:
     if mode == 'engines':
         prompt = f"""Список двигателей {car}. Только JSON без markdown:
 {{"engines":[{{"id":"2az_fe","name":"2AZ-FE 2.4 бензин 167 л.с.","volume":"2.4","fuel":"бензин","power":"167"}}]}}
-Основные варианты: бензин/дизель, разные объёмы. id: snake_case. Не более 10 штук."""
+Все реальные варианты: бензин/дизель/гибрид, разные объёмы и мощности. id: snake_case уникальный. До 15 штук."""
 
-        result = _call_ai(api_key, prompt, max_tokens=800)
+        result = _call_ai(api_key, prompt, max_tokens=1200)
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
     if mode == 'filters':
