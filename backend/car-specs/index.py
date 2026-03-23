@@ -33,8 +33,7 @@ def handler(event: dict, context) -> dict:
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
-    deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
-    api_key = deepseek_key
+    api_key = os.environ.get('YANDEX_API_KEY', '')
     use_openai = False
 
     generation = body.get('generation', '').strip()
@@ -210,36 +209,42 @@ def _save_cached_guides(car_id: str, result: dict):
 
 
 def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool = False) -> dict:
-    url = 'https://api.deepseek.com/chat/completions'
+    folder_id = os.environ.get('YANDEX_FOLDER_ID', '')
+    url = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
     payload = json.dumps({
-        'model': 'deepseek-chat',
+        'modelUri': f'gpt://{folder_id}/yandexgpt-lite',
+        'completionOptions': {
+            'stream': False,
+            'temperature': 0.1,
+            'maxTokens': min(max_tokens, 800),
+        },
         'messages': [
-            {'role': 'system', 'content': 'Reply with valid JSON only. No markdown. No explanation.'},
-            {'role': 'user', 'content': prompt}
+            {'role': 'system', 'text': 'Reply with valid JSON only. No markdown. No explanation.'},
+            {'role': 'user', 'text': prompt},
         ],
-        'temperature': 0.1,
-        'max_tokens': min(max_tokens, 800),
-        'stream': False,
     }).encode('utf-8')
 
-    for attempt in range(2):
-        data = None
-        try:
-            r = urllib.request.Request(url, data=payload, headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}, method='POST')
-            with urllib.request.urlopen(r, timeout=20) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-        except Exception as e:
-            print(f"AI call failed (attempt {attempt+1}): {e}")
-        if data is not None:
-            break
+    data = None
+    try:
+        r = urllib.request.Request(url, data=payload, headers={
+            'Authorization': f'Api-Key {api_key}',
+            'Content-Type': 'application/json',
+        }, method='POST')
+        with urllib.request.urlopen(r, timeout=25) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        print(f"AI call failed: {e}")
 
     if data is None:
         return _fallback(prompt)
 
-    content = data['choices'][0]['message']['content'].strip()
     try:
+        content = data['result']['alternatives'][0]['message']['text'].strip()
+        if content.startswith('```'):
+            content = content.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
         return json.loads(content)
-    except json.JSONDecodeError:
+    except Exception as e:
+        print(f"AI parse failed: {e}, raw: {str(data)[:300]}")
         return _fallback(prompt)
 
 
