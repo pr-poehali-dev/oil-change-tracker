@@ -483,7 +483,7 @@ export default function Index() {
               {remaining === 0 && (
                 <div className="w-full mt-4 flex items-start gap-3 bg-red-50 border border-red-400 rounded-2xl px-4 py-3">
                   <Icon name="AlertTriangle" size={18} className="text-red-600 shrink-0 mt-0.5" />
-                  <p className="text-sm font-golos font-semibold text-red-700 leading-snug">Эксплуатация ВВСТ невозможна! Замените масло.</p>
+                  <p className="text-sm font-golos font-semibold text-red-700 leading-snug">Эксплуатация автомобиля небезопасна! Замените масло.</p>
                 </div>
               )}
             </div>
