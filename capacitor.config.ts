@@ -5,8 +5,8 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // Загрузить в Android Studio: res → New → Image Asset → Launcher Icons
 
 const config: CapacitorConfig = {
-  appId: 'dev.poehali.oiltracker',
-  appName: 'Замена масла',
+  appId: 'dev.poehali.carhelper',
+  appName: 'Car Helper',
   webDir: 'dist',
   android: {
     buildOptions: {
