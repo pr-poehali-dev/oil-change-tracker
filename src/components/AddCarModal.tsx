@@ -21,7 +21,7 @@ const CAR_BRANDS = [
 ];
 
 const CAR_MODELS: Record<string, string[]> = {
-  "Toyota": ["Camry","Corolla","Land Cruiser","Land Cruiser Prado","RAV4","Hilux","Fortuner","Yaris","Auris","Avensis","Highlander","Sequoia","Tundra","Tacoma","4Runner","FJ Cruiser","Venza","Sienna","Alphard","Prius"],
+  "Toyota": ["Camry","Corolla","Land Cruiser","Land Cruiser Prado","RAV4","Hilux","Fortuner","Yaris","Auris","Avensis","Highlander","Sequoia","Tundra","Tacoma","4Runner","FJ Cruiser","Venza","Sienna","Alphard","Prius","Celica","Supra","MR2","Carina","Corona","Chaser","Cresta","Mark II","Wish","Ipsum","Estima","Previa","Verso","C-HR","Harrier","Kluger","Blade","Fielder","Premio","Allion","Caldina","Cressida","Soarer","Aristo","Altezza","Verossa","Brevis","Progres","Windom","Voltz","Ist","Urban Cruiser","Rush","Terios","bB","Porte","Spade","Tank","Roomy","Esquire","Noah","Voxy","Granvia"],
   "Volkswagen": ["Polo","Golf","Passat","Tiguan","Touareg","Jetta","Caddy","Transporter","Crafter","Amarok","Sharan","Touran"],
   "BMW": ["3 Series","5 Series","7 Series","X1","X3","X5","X6","X7","1 Series","2 Series","4 Series","6 Series","M3","M5"],
   "Mercedes-Benz": ["C-Class","E-Class","S-Class","GLC","GLE","GLS","A-Class","B-Class","CLA","CLS","G-Class","Sprinter","Vito"],
@@ -124,6 +124,51 @@ const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
       { name: "N100", years: "1997–2005" },
       { name: "N120 / N150", years: "2004–2015" },
       { name: "N210", years: "2015–н.в." },
+    ],
+    "Celica": [
+      { name: "A20/A35", years: "1977–1981" },
+      { name: "A40/A50", years: "1981–1985" },
+      { name: "A60", years: "1982–1985" },
+      { name: "T160", years: "1985–1989" },
+      { name: "T180", years: "1989–1993" },
+      { name: "T200", years: "1993–1999" },
+      { name: "T230", years: "1999–2006" },
+    ],
+    "Supra": [
+      { name: "A60", years: "1981–1986" },
+      { name: "A70", years: "1986–1993" },
+      { name: "A80", years: "1993–2002" },
+      { name: "A90", years: "2019–н.в." },
+    ],
+    "Mark II": [
+      { name: "X60", years: "1984–1988" },
+      { name: "X70", years: "1988–1992" },
+      { name: "X80", years: "1992–1996" },
+      { name: "X90", years: "1996–2000" },
+      { name: "X100", years: "1996–2000" },
+      { name: "X110", years: "2000–2004" },
+    ],
+    "Chaser": [
+      { name: "X70", years: "1984–1988" },
+      { name: "X80", years: "1988–1992" },
+      { name: "X90", years: "1992–1996" },
+      { name: "X100", years: "1996–2001" },
+    ],
+    "Harrier": [
+      { name: "XU10", years: "1997–2003" },
+      { name: "XU30", years: "2003–2013" },
+      { name: "ZSU60", years: "2013–2020" },
+      { name: "MXUA80", years: "2020–н.в." },
+    ],
+    "C-HR": [
+      { name: "NGX10/ZYX10", years: "2016–н.в." },
+    ],
+    "Prius": [
+      { name: "NHW10", years: "1997–2000" },
+      { name: "NHW20", years: "2003–2009" },
+      { name: "ZVW30", years: "2009–2015" },
+      { name: "ZVW50", years: "2015–2022" },
+      { name: "MXWH60", years: "2022–н.в." },
     ],
   },
   "Volkswagen": {

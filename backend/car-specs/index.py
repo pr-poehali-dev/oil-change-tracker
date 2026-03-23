@@ -244,7 +244,17 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
         content = data['result']['alternatives'][0]['message']['text'].strip()
         if content.startswith('```'):
             content = content.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
-        return json.loads(content)
+        parsed = json.loads(content)
+        if isinstance(parsed, list):
+            if '"engines"' in prompt:
+                return {'engines': parsed}
+            if '"filters"' in prompt:
+                return {'filters': parsed}
+            if '"consumables"' in prompt:
+                return {'consumables': parsed}
+            if '"guides"' in prompt:
+                return {'guides': parsed}
+        return parsed
     except Exception as e:
         print(f"AI parse failed: {e}, raw: {str(data)[:300]}")
         return _fallback(prompt)
