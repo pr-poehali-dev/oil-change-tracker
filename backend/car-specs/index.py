@@ -214,14 +214,14 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
     folder_id = os.environ.get('YANDEX_FOLDER_ID', '')
     url = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
     payload = json.dumps({
-        'modelUri': f'gpt://{folder_id}/yandexgpt-lite',
+        'modelUri': f'gpt://{folder_id}/yandexgpt',
         'completionOptions': {
             'stream': False,
             'temperature': 0.1,
-            'maxTokens': min(max_tokens, 800),
+            'maxTokens': 2000,
         },
         'messages': [
-            {'role': 'system', 'text': 'Reply with valid JSON only. No markdown. No explanation.'},
+            {'role': 'system', 'text': 'Отвечай только валидным JSON без markdown, без пояснений, без блоков ```json.'},
             {'role': 'user', 'text': prompt},
         ],
     }).encode('utf-8')
@@ -242,8 +242,14 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
 
     try:
         content = data['result']['alternatives'][0]['message']['text'].strip()
+        # Убираем markdown-обёртку если модель всё же добавила
         if content.startswith('```'):
-            content = content.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+            lines = content.split('\n')
+            content = '\n'.join(lines[1:])
+            if content.endswith('```'):
+                content = content[:-3].strip()
+            elif '```' in content:
+                content = content[:content.rfind('```')].strip()
         parsed = json.loads(content)
         if isinstance(parsed, list):
             if '"engines"' in prompt:
