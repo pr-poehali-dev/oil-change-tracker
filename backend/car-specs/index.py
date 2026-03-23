@@ -33,17 +33,9 @@ def handler(event: dict, context) -> dict:
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
-    openai_key = os.environ.get('OPENAI_API_KEY', '')
     deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
-    if openai_key:
-        api_key = openai_key
-        use_openai = True
-    elif deepseek_key:
-        api_key = deepseek_key
-        use_openai = False
-    else:
-        api_key = ''
-        use_openai = False
+    api_key = deepseek_key
+    use_openai = False
 
     generation = body.get('generation', '').strip()
     car = f"{brand} {model} {year}" + (f" ({generation})" if generation else "")
@@ -218,34 +210,29 @@ def _save_cached_guides(car_id: str, result: dict):
 
 
 def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool = False) -> dict:
-    if use_openai:
-        ai_model = 'gpt-4o-mini'
-        url = 'https://api.openai.com/v1/chat/completions'
-        extra = {'response_format': {'type': 'json_object'}}
-    else:
-        ai_model = 'deepseek-chat'
-        url = 'https://api.deepseek.com/chat/completions'
-        extra = {}
-
+    url = 'https://api.deepseek.com/chat/completions'
     payload = json.dumps({
-        'model': ai_model,
+        'model': 'deepseek-chat',
         'messages': [
             {'role': 'system', 'content': 'Reply with valid JSON only. No markdown. No explanation.'},
             {'role': 'user', 'content': prompt}
         ],
         'temperature': 0.1,
-        'max_tokens': max_tokens,
+        'max_tokens': min(max_tokens, 800),
         'stream': False,
-        **extra,
     }).encode('utf-8')
 
-    data = None
-    try:
-        r = urllib.request.Request(url, data=payload, headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}, method='POST')
-        with urllib.request.urlopen(r, timeout=25) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-    except Exception as e:
-        print(f"AI call failed: {e}")
+    for attempt in range(2):
+        data = None
+        try:
+            r = urllib.request.Request(url, data=payload, headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(r, timeout=20) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+        except Exception as e:
+            print(f"AI call failed (attempt {attempt+1}): {e}")
+        if data is not None:
+            break
+
     if data is None:
         return _fallback(prompt)
 
