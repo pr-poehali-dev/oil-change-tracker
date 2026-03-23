@@ -6,6 +6,17 @@ export type ManualStep = {
   warning?: string;
 };
 export type ManualGuide = { id: string; title: string; icon: string; steps: ManualStep[]; article?: string; interval?: string; };
+export type Consumable = {
+  id: string;
+  category: string;
+  name: string;
+  spec: string;
+  article: string;
+  interval: string;
+  qty: string;
+  note: string;
+};
+
 export type CarConfig = {
   id: string;
   brand: string;
@@ -15,6 +26,7 @@ export type CarConfig = {
   oilInterval: number;
   guides: ManualGuide[];
   custom?: boolean;
+  consumables?: Consumable[];
 };
 export type CarSpecs = [string, string][];
 

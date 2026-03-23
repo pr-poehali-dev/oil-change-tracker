@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
-  CarConfig, ManualGuide,
+  CarConfig, ManualGuide, Consumable,
   DEFAULT_SPECS,
 } from "@/lib/cars";
 import {
@@ -48,7 +48,7 @@ export default function Index() {
   const car = allCars.find((c) => c.id === selectedCarId) ?? allCars[0] ?? null;
   const OIL_INTERVAL = car?.oilInterval ?? 0;
 
-  const [tab, setTab] = useState<"counter" | "calendar" | "instructions">("counter");
+  const [tab, setTab] = useState<"counter" | "calendar" | "instructions" | "consumables">("counter");
   const [dailyInput, setDailyInput] = useState("");
   const [entries, setEntries] = useState<DayEntry[]>([]);
   const [totalKm, setTotalKm] = useState<number>(0);
@@ -89,6 +89,7 @@ export default function Index() {
     localStorage.setItem(selectedCarKey(), selectedCarId);
     setActiveGuide(null);
     setOpenStep(null);
+    setTab("counter");
     if (carsLoaded) {
       loadEntriesForCar(selectedCarId);
     }
@@ -216,6 +217,7 @@ export default function Index() {
   }
 
   const [filtersRefreshing, setFiltersRefreshing] = useState(false);
+  const [consumablesLoading, setConsumablesLoading] = useState(false);
 
   async function handleRefreshFilters() {
     if (!car?.custom || filtersRefreshing) return;
@@ -251,6 +253,37 @@ export default function Index() {
     }
   }
 
+  const CAR_SPECS_URL = "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23";
+
+  async function handleLoadConsumables(forceRefresh = false) {
+    if (!car || consumablesLoading) return;
+    if (!forceRefresh && car.consumables && car.consumables.length > 0) return;
+    setConsumablesLoading(true);
+    try {
+      const res = await fetch(CAR_SPECS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brand: car.brand, model: car.model, year: car.year,
+          carId: car.id, mode: "consumables", forceRefresh,
+          ...(car.engine ? { engine: car.engine } : {}),
+        }),
+      });
+      const data = await res.json();
+      const list: Consumable[] = data.consumables || [];
+      if (list.length > 0) {
+        setCustomCars((prev) =>
+          prev.map((c) => c.id === car.id ? { ...c, consumables: list } : c)
+        );
+        await apiUpdateCar(car.id, { consumables: list }).catch(() => {});
+      }
+    } catch {
+      showNotif("Не удалось загрузить расходники");
+    } finally {
+      setConsumablesLoading(false);
+    }
+  }
+
   const circumference = 2 * Math.PI * 54;
   const dash = circumference * (1 - progress);
   const urgencyColor = urgency === "danger" ? "#e05a2b" : urgency === "warn" ? "#c9922a" : "#4a7c59";
@@ -267,6 +300,7 @@ export default function Index() {
     { id: "counter", label: "Счётчик" },
     { id: "calendar", label: "Календарь" },
     { id: "instructions", label: "Инструкции" },
+    { id: "consumables", label: "Расходники" },
   ] as const;
 
   return (
@@ -346,7 +380,11 @@ export default function Index() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => { setTab(t.id); if (t.id !== "instructions") { setActiveGuide(null); setOpenStep(null); } }}
+              onClick={() => {
+                setTab(t.id);
+                if (t.id !== "instructions") { setActiveGuide(null); setOpenStep(null); }
+                if (t.id === "consumables") { handleLoadConsumables(); }
+              }}
               className={`flex-1 py-2 rounded-lg text-sm font-golos font-medium transition-all duration-200 ${
                 tab === t.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
@@ -723,6 +761,99 @@ export default function Index() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── РАСХОДНИКИ ── */}
+        {tab === "consumables" && (
+          <div className="animate-fade-in space-y-4">
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider px-1">
+              Расходники для {car?.brand} {car?.model} {car?.year}
+            </p>
+
+            {consumablesLoading && (
+              <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center gap-3">
+                <Icon name="Loader2" size={28} className="text-muted-foreground animate-spin" />
+                <p className="text-sm font-golos text-muted-foreground">ИИ подбирает расходники...</p>
+                <p className="text-xs font-mono text-muted-foreground/60">Это займёт несколько секунд</p>
+              </div>
+            )}
+
+            {!consumablesLoading && (!car?.consumables || car.consumables.length === 0) && (
+              <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center gap-3 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center">
+                  <Icon name="Package" size={22} className="text-muted-foreground" />
+                </div>
+                <p className="text-sm font-golos text-foreground font-semibold">Список расходников пуст</p>
+                <p className="text-xs font-golos text-muted-foreground leading-relaxed">ИИ подберёт масло, фильтры, свечи и другие расходники для вашего автомобиля</p>
+                <button
+                  onClick={() => handleLoadConsumables(true)}
+                  className="mt-1 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all"
+                >
+                  <Icon name="Sparkles" size={15} />
+                  Подобрать расходники
+                </button>
+              </div>
+            )}
+
+            {!consumablesLoading && car?.consumables && car.consumables.length > 0 && (() => {
+              const grouped = car.consumables.reduce<Record<string, Consumable[]>>((acc, c) => {
+                if (!acc[c.category]) acc[c.category] = [];
+                acc[c.category].push(c);
+                return acc;
+              }, {});
+              return (
+                <>
+                  {Object.entries(grouped).map(([category, items]) => (
+                    <div key={category} className="bg-card rounded-2xl border border-border overflow-hidden">
+                      <div className="px-5 py-3 border-b border-border/50 bg-secondary/30">
+                        <p className="text-xs font-mono font-semibold text-muted-foreground uppercase tracking-wider">{category}</p>
+                      </div>
+                      <div className="divide-y divide-border/40">
+                        {items.map((item) => (
+                          <div key={item.id} className="px-5 py-4">
+                            <div className="flex items-start justify-between gap-3 mb-1.5">
+                              <p className="font-golos font-semibold text-foreground text-sm leading-snug">{item.name}</p>
+                              {item.qty && (
+                                <span className="shrink-0 text-xs font-mono bg-secondary text-foreground px-2 py-0.5 rounded-lg">{item.qty}</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                              {item.spec && (
+                                <span className="text-xs font-mono text-muted-foreground">{item.spec}</span>
+                              )}
+                              {item.article && (
+                                <span className="flex items-center gap-1 text-xs font-mono text-muted-foreground">
+                                  <Icon name="Tag" size={10} className="text-muted-foreground/60" />
+                                  {item.article}
+                                </span>
+                              )}
+                              {item.interval && (
+                                <span className="flex items-center gap-1 text-xs font-mono text-muted-foreground">
+                                  <Icon name="Clock" size={10} className="text-muted-foreground/60" />
+                                  {item.interval}
+                                </span>
+                              )}
+                            </div>
+                            {item.note && (
+                              <p className="text-xs font-golos text-muted-foreground/70 mt-1.5 leading-relaxed">{item.note}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => handleLoadConsumables(true)}
+                    disabled={consumablesLoading}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-secondary text-foreground text-sm font-golos hover:bg-muted active:scale-95 transition-all disabled:opacity-60"
+                  >
+                    <Icon name="RefreshCw" size={15} />
+                    Обновить список расходников
+                  </button>
+                </>
+              );
+            })()}
           </div>
         )}
 

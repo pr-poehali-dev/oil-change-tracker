@@ -40,7 +40,7 @@ def handler(event: dict, context) -> dict:
         cur = conn.cursor()
         cur.execute("""
             SELECT c.id, c.brand, c.model, c.year, c.oil_interval, c.guides, c.custom,
-                   cs.specs, c.filters
+                   cs.specs, c.filters, c.consumables
             FROM cars c
             LEFT JOIN car_specs cs ON cs.car_id = c.id
             ORDER BY c.created_at
@@ -54,6 +54,7 @@ def handler(event: dict, context) -> dict:
                 'oilInterval': row[4], 'guides': row[5] if row[5] is not None else [],
                 'custom': row[6], 'specs': row[7] if row[7] is not None else [],
                 'filters': row[8] if row[8] is not None else [],
+                'consumables': row[9] if row[9] is not None else [],
             })
         return resp(200, cars)
 
@@ -91,6 +92,8 @@ def handler(event: dict, context) -> dict:
                     fields.append(f'{col} = %s'); values.append(body[key])
             if 'guides' in body:
                 fields.append('guides = %s'); values.append(json.dumps(body['guides'], ensure_ascii=False))
+            if 'consumables' in body:
+                fields.append('consumables = %s'); values.append(json.dumps(body['consumables'], ensure_ascii=False))
             conn = get_conn()
             cur = conn.cursor()
             if fields:

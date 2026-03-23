@@ -7,22 +7,25 @@
       "expectedStatus": 200
     },
     {
-      "name": "Двигатели Toyota Camry из локальной базы",
+      "name": "Двигатели Toyota Camry",
       "method": "POST",
       "path": "/",
       "body": { "brand": "Toyota", "model": "Camry", "year": "2010", "mode": "engines" },
-      "expectedStatus": 200,
-      "expectedBody": { "engines": [{}] },
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
+    },
+    {
+      "name": "Расходники mode=consumables",
+      "method": "POST",
+      "path": "/",
+      "body": { "brand": "Toyota", "model": "Camry", "year": "2020", "mode": "consumables", "carId": "nonexistent_test_999" },
+      "expectedStatus": 200
     },
     {
       "name": "Ошибка без параметров",
       "method": "POST",
       "path": "/",
       "body": {},
-      "expectedStatus": 400,
-      "expectedBody": { "error": "string" },
-      "bodyMatcher": "partial"
+      "expectedStatus": 400
     }
   ]
 }

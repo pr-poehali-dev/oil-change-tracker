@@ -85,6 +85,25 @@ def handler(event: dict, context) -> dict:
 
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': filters}, ensure_ascii=False)}
 
+    if mode == 'consumables':
+        if car_id and not force_refresh:
+            cached = _get_cached_consumables(car_id)
+            if cached:
+                print(f"Cache hit consumables: {car_id}")
+                return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'consumables': cached}, ensure_ascii=False)}
+
+        prompt = f"""Список расходников для {car}{eng}. JSON без markdown:
+{{"consumables":[{{"id":"oil","category":"Масло и фильтры","name":"Моторное масло","spec":"5W-30 SN/CF","article":"оригинал артикул","interval":"10000 км или 1 год","qty":"4.5 л","note":"допуск Toyota WS"}},{{"id":"air_filter","category":"Масло и фильтры","name":"Воздушный фильтр","spec":"","article":"17801-0H010","interval":"30000 км","qty":"1 шт","note":""}},{{"id":"cabin_filter","category":"Масло и фильтры","name":"Салонный фильтр","spec":"","article":"87139-0E040","interval":"15000 км","qty":"1 шт","note":""}},{{"id":"spark","category":"Зажигание","name":"Свечи зажигания","spec":"Иридиевые","article":"90919-01253","interval":"60000 км","qty":"4 шт","note":""}},{{"id":"brake_fluid","category":"Тормозная система","name":"Тормозная жидкость","spec":"DOT 4","article":"","interval":"2 года","qty":"0.5 л","note":""}},{{"id":"coolant","category":"Охлаждение","name":"Антифриз","spec":"LLC красный","article":"","interval":"5 лет","qty":"7 л","note":""}}]}}
+Категории: Масло и фильтры, Зажигание, Тормозная система, Охлаждение, Трансмиссия, Подвеска. Реальные OEM артикулы для {car}. 10-15 позиций."""
+
+        result = _call_ai(api_key, prompt, max_tokens=2000, use_openai=use_openai)
+        consumables = result.get('consumables', [])
+
+        if car_id and consumables:
+            _save_cached_consumables(car_id, consumables)
+
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'consumables': consumables}, ensure_ascii=False)}
+
     if car_id and not force_refresh:
         cached = _get_cached_guides(car_id)
         if cached:
@@ -138,6 +157,32 @@ def _save_cached_filters(car_id: str, filters: list):
         conn.close()
     except Exception as e:
         print(f"Cache save filters error: {e}")
+
+
+def _get_cached_consumables(car_id: str) -> list:
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"SELECT consumables FROM {SCHEMA}.cars WHERE id = %s", (car_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception as e:
+        print(f"Cache read consumables error: {e}")
+    return []
+
+
+def _save_cached_consumables(car_id: str, consumables: list):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.cars SET consumables = %s WHERE id = %s",
+                    (json.dumps(consumables, ensure_ascii=False), car_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Cache save consumables error: {e}")
 
 
 def _get_cached_guides(car_id: str) -> dict:
@@ -216,4 +261,6 @@ def _fallback(prompt: str) -> dict:
         return {"engines": []}
     if '"filters"' in prompt:
         return {"filters": []}
+    if '"consumables"' in prompt:
+        return {"consumables": []}
     return {"specs": [], "oilInterval": 10000, "guides": []}
