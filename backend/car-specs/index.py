@@ -33,14 +33,14 @@ def handler(event: dict, context) -> dict:
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
-    openai_key = os.environ.get('OPENAI_API_KEY', '')
     deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
-    if openai_key:
-        api_key = openai_key
-        use_openai = True
-    elif deepseek_key:
+    openai_key = os.environ.get('OPENAI_API_KEY', '')
+    if deepseek_key:
         api_key = deepseek_key
         use_openai = False
+    elif openai_key:
+        api_key = openai_key
+        use_openai = True
     else:
         api_key = ''
         use_openai = False
