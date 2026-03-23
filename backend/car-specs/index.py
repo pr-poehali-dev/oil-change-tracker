@@ -50,8 +50,10 @@ def handler(event: dict, context) -> dict:
         if not api_key:
             return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': []}, ensure_ascii=False)}
 
-        prompt = f'Engines for {car}. JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} Up to 12 variants. Include engine code, volume, fuel, power. Russian fuel names.'
+        prompt = f'Список двигателей для {car}. Верни JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} До 12 вариантов. Включи код двигателя, объём, тип топлива (бензин/дизель/гибрид), мощность в л.с.'
+        print(f"Calling AI for engines: {car}")
         result = _call_ai(api_key, prompt, max_tokens=600, use_openai=use_openai)
+        print(f"AI engines result: {str(result)[:200]}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
     if not api_key:
