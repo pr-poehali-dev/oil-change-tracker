@@ -37,7 +37,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         @keyframes splashLogo { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
       `}</style>
       <img
-        src="https://cdn.poehali.dev/files/e183199c-d55a-4586-9be2-0c39ea194a3a.png"
+        src="https://cdn.poehali.dev/files/3e44bb14-1f15-42c9-936f-974135635972.png"
         alt="АвтоПилот"
         style={{ width: 220, animation: "splashLogo 0.5s ease both" }}
       />

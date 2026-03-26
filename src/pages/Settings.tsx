@@ -30,9 +30,7 @@ export default function Settings() {
           >
             <Icon name="ChevronLeft" size={20} />
           </button>
-          <div className="bg-black rounded-xl p-1">
-            <img src="https://cdn.poehali.dev/files/e183199c-d55a-4586-9be2-0c39ea194a3a.png" alt="АвтоПилот" className="w-16 h-auto" />
-          </div>
+          <img src="https://cdn.poehali.dev/files/3e44bb14-1f15-42c9-936f-974135635972.png" alt="АвтоПилот" className="w-16 h-auto" />
         </div>
         <h1 className="text-lg font-golos font-bold text-foreground tracking-tight">Настройки</h1>
       </header>
