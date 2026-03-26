@@ -308,8 +308,21 @@ export default function Index() {
 
       {/* Header */}
       <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full">
-        <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">Контроль автомобиля</p>
-        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">Замена масла</h1>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 flex items-center justify-center">
+            <svg viewBox="0 0 100 70" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+              <rect x="12" y="18" width="60" height="34" rx="4" stroke="#FACC15" strokeWidth="6" fill="none"/>
+              <rect x="72" y="26" width="12" height="18" rx="3" stroke="#FACC15" strokeWidth="5" fill="none"/>
+              <rect x="2" y="26" width="10" height="10" rx="2" stroke="#FACC15" strokeWidth="5" fill="none"/>
+              <rect x="22" y="8" width="10" height="12" rx="2" stroke="#FACC15" strokeWidth="5" fill="none"/>
+              <rect x="44" y="8" width="10" height="12" rx="2" stroke="#FACC15" strokeWidth="5" fill="none"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase leading-none mb-0.5">Контроль автомобиля</p>
+            <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight leading-none">АвтоПилот</h1>
+          </div>
+        </div>
       </header>
 
       {/* Car selector dropdown */}
