@@ -1,0 +1,84 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Icon from "@/components/ui/icon";
+
+function getTheme(): "light" | "dark" {
+  return (localStorage.getItem("theme") as "light" | "dark") || "light";
+}
+
+function applyTheme(theme: "light" | "dark") {
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  localStorage.setItem("theme", theme);
+}
+
+export default function Settings() {
+  const navigate = useNavigate();
+  const [theme, setTheme] = useState<"light" | "dark">(getTheme);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full flex items-center gap-3">
+        <button
+          onClick={() => navigate("/")}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-card border border-border hover:bg-secondary transition-colors"
+        >
+          <Icon name="ChevronLeft" size={20} />
+        </button>
+        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">Настройки</h1>
+      </header>
+
+      <div className="px-6 max-w-md mx-auto w-full flex-1 space-y-4 pb-10">
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
+                <Icon name={theme === "dark" ? "Moon" : "Sun"} size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Тёмная тема</p>
+                <p className="text-xs text-muted-foreground">Бережёт глаза в темноте</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className={`relative w-12 h-7 rounded-full transition-colors ${theme === "dark" ? "bg-accent" : "bg-muted"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${theme === "dark" ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
+              <Icon name="Info" size={18} />
+            </div>
+            <p className="text-sm font-medium text-foreground">О приложении</p>
+          </div>
+          <div className="px-5 py-3 space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Название</span>
+              <span className="text-sm font-medium text-foreground">АвтоПилот</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Версия</span>
+              <span className="text-sm font-mono text-foreground">1.0.0</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Билд</span>
+              <span className="text-sm font-mono text-foreground">2026.03.26</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Создатель</span>
+              <span className="text-sm font-medium text-foreground">vcomm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

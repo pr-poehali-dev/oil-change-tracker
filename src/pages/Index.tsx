@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
@@ -32,6 +33,7 @@ const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","
 
 // ─── Component ────────────────────────────────────────────────────
 export default function Index() {
+  const navigate = useNavigate();
   const [customCars, setCustomCars] = useState<CarConfig[]>([]);
   const [customSpecs, setCustomSpecs] = useState<Record<string, [string, string][]>>({});
   const [carsLoaded, setCarsLoaded] = useState(false);
@@ -307,9 +309,17 @@ export default function Index() {
     <div className="min-h-screen bg-background flex flex-col">
 
       {/* Header */}
-      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full">
-        <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">Контроль автомобиля</p>
-        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">АвтоПилот</h1>
+      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full flex items-end justify-between">
+        <div>
+          <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">Контроль автомобиля</p>
+          <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">АвтоПилот</h1>
+        </div>
+        <button
+          onClick={() => navigate("/settings")}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-card border border-border hover:bg-secondary transition-colors mb-0.5"
+        >
+          <Icon name="Settings" size={18} />
+        </button>
       </header>
 
       {/* Car selector dropdown */}
