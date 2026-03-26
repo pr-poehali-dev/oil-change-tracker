@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
+import Logo from "@/components/Logo";
 
 function getTheme(): "light" | "dark" {
   return (localStorage.getItem("theme") as "light" | "dark") || "light";
@@ -21,14 +22,17 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full flex items-center gap-3">
-        <button
-          onClick={() => navigate("/")}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-card border border-border hover:bg-secondary transition-colors"
-        >
-          <Icon name="ChevronLeft" size={20} />
-        </button>
-        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">Настройки</h1>
+      <header className="pt-8 pb-4 px-6 max-w-md mx-auto w-full flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate("/")}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-card border border-border hover:bg-secondary transition-colors"
+          >
+            <Icon name="ChevronLeft" size={20} />
+          </button>
+          <Logo className="w-28 h-auto" />
+        </div>
+        <h1 className="text-lg font-golos font-bold text-foreground tracking-tight">Настройки</h1>
       </header>
 
       <div className="px-6 max-w-md mx-auto w-full flex-1 space-y-4 pb-10">

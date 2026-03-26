@@ -1,10 +1,11 @@
-export default function Logo({ className = "" }: { className?: string }) {
+export default function Logo({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <svg
       viewBox="0 0 220 140"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      style={style}
     >
       {/* Основной корпус двигателя */}
       <rect x="28" y="30" width="140" height="80" rx="12" stroke="#D4900A" strokeWidth="8" fill="none" />

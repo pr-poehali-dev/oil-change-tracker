@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
+import Logo from "@/components/Logo";
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
   CarConfig, ManualGuide, Consumable,
@@ -309,14 +310,11 @@ export default function Index() {
     <div className="min-h-screen bg-background flex flex-col">
 
       {/* Header */}
-      <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full flex items-end justify-between">
-        <div>
-          <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">Контроль автомобиля</p>
-          <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">АвтоПилот</h1>
-        </div>
+      <header className="pt-8 pb-4 px-6 max-w-md mx-auto w-full flex items-center justify-between">
+        <Logo className="w-32 h-auto" />
         <button
           onClick={() => navigate("/settings")}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-card border border-border hover:bg-secondary transition-colors mb-0.5"
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-card border border-border hover:bg-secondary transition-colors"
         >
           <Icon name="Settings" size={18} />
         </button>
