@@ -309,14 +309,8 @@ export default function Index() {
       {/* Header */}
       <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full">
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 flex items-center justify-center">
-            <svg viewBox="0 0 100 70" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-              <rect x="12" y="18" width="60" height="34" rx="4" stroke="#FACC15" strokeWidth="6" fill="none"/>
-              <rect x="72" y="26" width="12" height="18" rx="3" stroke="#FACC15" strokeWidth="5" fill="none"/>
-              <rect x="2" y="26" width="10" height="10" rx="2" stroke="#FACC15" strokeWidth="5" fill="none"/>
-              <rect x="22" y="8" width="10" height="12" rx="2" stroke="#FACC15" strokeWidth="5" fill="none"/>
-              <rect x="44" y="8" width="10" height="12" rx="2" stroke="#FACC15" strokeWidth="5" fill="none"/>
-            </svg>
+          <div className="w-10 h-10 rounded-lg overflow-hidden">
+            <img src="https://cdn.poehali.dev/projects/3cdd9cd7-5593-4904-947d-4e73989e29c5/files/d2bc9ec9-5979-4a6b-af40-dd9fc5354317.jpg" alt="logo" className="w-full h-full object-cover" />
           </div>
           <div>
             <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase leading-none mb-0.5">Контроль автомобиля</p>
