@@ -308,15 +308,8 @@ export default function Index() {
 
       {/* Header */}
       <header className="pt-10 pb-4 px-6 max-w-md mx-auto w-full">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-lg overflow-hidden">
-            <img src="https://cdn.poehali.dev/projects/3cdd9cd7-5593-4904-947d-4e73989e29c5/files/d2bc9ec9-5979-4a6b-af40-dd9fc5354317.jpg" alt="logo" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase leading-none mb-0.5">Контроль автомобиля</p>
-            <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight leading-none">АвтоПилот</h1>
-          </div>
-        </div>
+        <p className="text-xs font-mono text-muted-foreground tracking-widest uppercase mb-1">Контроль автомобиля</p>
+        <h1 className="text-2xl font-golos font-bold text-foreground tracking-tight">АвтоПилот</h1>
       </header>
 
       {/* Car selector dropdown */}
