@@ -5,14 +5,27 @@ const URLS = {
   cars: "https://functions.poehali.dev/569f47e9-9c87-4e78-aac2-72676d772a07",
 };
 
-async function req(url: string, method = "GET", body?: unknown) {
+function getUserId(): string {
+  let uid = localStorage.getItem("user_uid");
+  if (!uid) {
+    uid = crypto.randomUUID();
+    localStorage.setItem("user_uid", uid);
+  }
+  return uid;
+}
+
+async function req(url: string, method = "GET", body?: unknown, extraHeaders?: Record<string, string>) {
   const res = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...extraHeaders },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function carsHeaders() {
+  return { "X-User-Id": getUserId() };
 }
 
 // Clients
@@ -40,8 +53,8 @@ export const apiUpdateOrder = (id: number, data: Record<string, unknown>) =>
   req(`${URLS.orders}/${id}`, "PUT", data);
 
 // Cars
-const carsPost = (body: Record<string, unknown>) => req(URLS.cars, "POST", body);
-export const apiGetCars = () => req(URLS.cars);
+const carsPost = (body: Record<string, unknown>) => req(URLS.cars, "POST", body, carsHeaders());
+export const apiGetCars = () => req(URLS.cars, "GET", undefined, carsHeaders());
 export const apiCreateCar = (data: Record<string, unknown>) => carsPost({ action: "create_car", ...data });
 export const apiUpdateCar = (id: string, data: Record<string, unknown>) => carsPost({ action: "update_car", id, ...data });
 export const apiDeleteCar = (id: string) => carsPost({ action: "delete_car", id });

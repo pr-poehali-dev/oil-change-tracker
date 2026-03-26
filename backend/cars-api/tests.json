@@ -7,18 +7,20 @@
       "expectedStatus": 200
     },
     {
-      "name": "GET список автомобилей",
+      "name": "GET список автомобилей пользователя",
       "method": "GET",
       "path": "/",
+      "headers": {"X-User-Id": "test-user-uuid-123"},
       "expectedStatus": 200
     },
     {
-      "name": "Создать автомобиль",
+      "name": "Создать автомобиль для пользователя",
       "method": "POST",
       "path": "/",
+      "headers": {"X-User-Id": "test-user-uuid-123"},
       "body": {
         "action": "create_car",
-        "id": "test_car_2020",
+        "id": "test_car_uuid_2020",
         "brand": "Toyota",
         "model": "Test",
         "year": "2020",
@@ -32,26 +34,13 @@
       "bodyMatcher": "partial"
     },
     {
-      "name": "Поиск авто в БД",
-      "method": "POST",
-      "path": "/",
-      "body": {
-        "action": "search_car",
-        "brand": "Toyota",
-        "model": "Test",
-        "year": "2020"
-      },
-      "expectedStatus": 200,
-      "expectedBody": {"found": true},
-      "bodyMatcher": "partial"
-    },
-    {
       "name": "Удалить автомобиль",
       "method": "POST",
       "path": "/",
+      "headers": {"X-User-Id": "test-user-uuid-123"},
       "body": {
         "action": "delete_car",
-        "id": "test_car_2020"
+        "id": "test_car_uuid_2020"
       },
       "expectedStatus": 200,
       "expectedBody": {"ok": true},

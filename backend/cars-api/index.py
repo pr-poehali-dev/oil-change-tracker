@@ -1,7 +1,6 @@
 """
 REST API для управления автомобилями пользователя.
-Все запросы идут через корневой URL с полем action в теле или методом GET.
-GET / — список авто
+GET / — список авто текущего пользователя (по X-User-Id)
 POST / с action: create_car, update_car, delete_car, get_entries, save_entry, delete_entry, search_car
 """
 import json
@@ -28,12 +27,18 @@ def resp(status, body):
     }
 
 
+def get_user_id(event):
+    headers = event.get('headers') or {}
+    return headers.get('X-User-Id') or headers.get('x-user-id') or 'anonymous'
+
+
 def handler(event: dict, context) -> dict:
-    """Обработчик CRUD операций с автомобилями и записями пробега."""
+    """Обработчик CRUD операций с автомобилями и записями пробега, с изоляцией по user_id."""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
 
     method = event.get('httpMethod', 'GET')
+    user_id = get_user_id(event)
 
     if method == 'GET':
         conn = get_conn()
@@ -43,8 +48,9 @@ def handler(event: dict, context) -> dict:
                    cs.specs, c.filters, c.consumables
             FROM cars c
             LEFT JOIN car_specs cs ON cs.car_id = c.id
+            WHERE c.user_id = %s
             ORDER BY c.created_at
-        """)
+        """, (user_id,))
         rows = cur.fetchall()
         conn.close()
         cars = []
@@ -69,13 +75,14 @@ def handler(event: dict, context) -> dict:
             conn = get_conn()
             cur = conn.cursor()
             cur.execute("""
-                INSERT INTO cars (id, brand, model, year, oil_interval, guides, custom)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO cars (id, brand, model, year, oil_interval, guides, custom, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     brand = EXCLUDED.brand, model = EXCLUDED.model, year = EXCLUDED.year,
-                    oil_interval = EXCLUDED.oil_interval, guides = EXCLUDED.guides
+                    oil_interval = EXCLUDED.oil_interval, guides = EXCLUDED.guides,
+                    user_id = EXCLUDED.user_id
             """, (car_id, body['brand'], body['model'], body['year'],
-                  body.get('oilInterval', 5000), guides, body.get('custom', True)))
+                  body.get('oilInterval', 5000), guides, body.get('custom', True), user_id))
             cur.execute("""
                 INSERT INTO car_specs (car_id, specs) VALUES (%s, %s)
                 ON CONFLICT (car_id) DO UPDATE SET specs = EXCLUDED.specs
@@ -98,7 +105,8 @@ def handler(event: dict, context) -> dict:
             cur = conn.cursor()
             if fields:
                 values.append(car_id)
-                cur.execute(f"UPDATE cars SET {', '.join(fields)} WHERE id = %s", values)
+                values.append(user_id)
+                cur.execute(f"UPDATE cars SET {', '.join(fields)} WHERE id = %s AND user_id = %s", values)
             if 'specs' in body:
                 cur.execute("""
                     INSERT INTO car_specs (car_id, specs) VALUES (%s, %s)
@@ -114,7 +122,7 @@ def handler(event: dict, context) -> dict:
             cur = conn.cursor()
             cur.execute("DELETE FROM car_entries WHERE car_id = %s", (car_id,))
             cur.execute("DELETE FROM car_specs WHERE car_id = %s", (car_id,))
-            cur.execute("DELETE FROM cars WHERE id = %s", (car_id,))
+            cur.execute("DELETE FROM cars WHERE id = %s AND user_id = %s", (car_id, user_id))
             conn.commit()
             conn.close()
             return resp(200, {'ok': True})
