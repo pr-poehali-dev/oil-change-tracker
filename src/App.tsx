@@ -17,6 +17,40 @@ if (savedTheme === "dark") {
   document.documentElement.classList.add("dark");
 }
 
+function IOSInstallBanner() {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isInStandaloneMode = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const dismissed = localStorage.getItem("ios_install_dismissed");
+
+  const [visible, setVisible] = useState(isIOS && !isInStandaloneMode && !dismissed);
+
+  const dismiss = () => {
+    localStorage.setItem("ios_install_dismissed", "1");
+    setVisible(false);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div style={{
+      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10000,
+      background: "#1a1a1a", borderTop: "1px solid #333",
+      padding: "16px 20px 32px", display: "flex", alignItems: "flex-start", gap: 14,
+      animation: "slideUp 0.3s ease both",
+    }}>
+      <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+      <img src="https://cdn.poehali.dev/files/4e1d93e8-81a3-4e82-849b-79d148023d28.png" alt="" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ color: "#fff", fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Установить АвтоПилот</div>
+        <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.4 }}>
+          Нажмите <span style={{ color: "#fff" }}>«Поделиться»</span> <span style={{ fontSize: 16 }}>⬆️</span> внизу экрана, затем <span style={{ color: "#fff" }}>«На экран "Домой"»</span>
+        </div>
+      </div>
+      <button onClick={dismiss} style={{ background: "none", border: "none", color: "#666", fontSize: 22, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+    </div>
+  );
+}
+
 function SplashScreen({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     const t = setTimeout(onDone, 1800);
@@ -54,6 +88,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         {splash && <SplashScreen onDone={() => setSplash(false)} />}
+        <IOSInstallBanner />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
