@@ -70,7 +70,7 @@ export default function Settings() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Билд</span>
-              <span className="text-sm font-mono text-foreground">2026.03.26</span>
+              <span className="text-sm font-mono text-foreground">79b5f0f</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Создатель</span>
