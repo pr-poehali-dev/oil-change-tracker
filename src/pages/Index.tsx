@@ -51,7 +51,13 @@ export default function Index() {
   const car = allCars.find((c) => c.id === selectedCarId) ?? allCars[0] ?? null;
   const OIL_INTERVAL = car?.oilInterval ?? 0;
 
-  const [tab, setTab] = useState<"counter" | "calendar" | "instructions" | "consumables">("counter");
+  const [tab, setTab] = useState<"counter" | "calendar" | "instructions" | "consumables">("instructions");
+  const [autoDailyKm, setAutoDailyKm] = useState<number>(() => {
+    const v = localStorage.getItem("auto_daily_km");
+    return v ? parseFloat(v) : 0;
+  });
+  const [showAutoKmModal, setShowAutoKmModal] = useState(false);
+  const [autoKmInput, setAutoKmInput] = useState("");
   const [dailyInput, setDailyInput] = useState("");
   const [entries, setEntries] = useState<DayEntry[]>([]);
   const [totalKm, setTotalKm] = useState<number>(0);
@@ -92,11 +98,32 @@ export default function Index() {
     localStorage.setItem(selectedCarKey(), selectedCarId);
     setActiveGuide(null);
     setOpenStep(null);
-    setTab("counter");
+    setTab("instructions");
     if (carsLoaded) {
       loadEntriesForCar(selectedCarId);
     }
   }, [selectedCarId, carsLoaded, loadEntriesForCar]);
+
+  // Автопробег: записывать N км каждый день
+  useEffect(() => {
+    if (!autoDailyKm || autoDailyKm <= 0 || !car) return;
+    const lastKey = `auto_km_last_${car.id}`;
+    const today = getTodayStr();
+    const last = localStorage.getItem(lastKey);
+    if (last === today) return;
+    // уже загружены entries?
+    if (!carsLoaded) return;
+    const existing = entries.find((e) => e.date === today);
+    const newKm = existing ? +(existing.km + autoDailyKm).toFixed(1) : autoDailyKm;
+    const newEntries = existing
+      ? entries.map((e) => e.date === today ? { ...e, km: newKm } : e)
+      : [...entries, { date: today, km: autoDailyKm }];
+    const newTotal = +(entries.reduce((s, e) => s + e.km, 0) - (existing?.km ?? 0) + newKm).toFixed(1);
+    setEntries(newEntries);
+    setTotalKm(newTotal);
+    apiSaveEntry(car.id, today, newKm).catch(() => {});
+    localStorage.setItem(lastKey, today);
+  }, [autoDailyKm, car, carsLoaded, entries]);
 
   // Локальные уведомления
   useEffect(() => {
@@ -300,10 +327,10 @@ export default function Index() {
   const specs = car ? (allSpecs[car.id] ?? []) : [];
 
   const TABS = [
-    { id: "counter", label: "Счётчик" },
-    { id: "calendar", label: "Календарь" },
     { id: "instructions", label: "Инструкции" },
     { id: "consumables", label: "Расходники" },
+    { id: "counter", label: "Счётчик" },
+    { id: "calendar", label: "Календарь" },
   ] as const;
 
   return (
@@ -497,7 +524,16 @@ export default function Index() {
             </div>
 
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
-              <p className="text-sm font-golos font-semibold text-foreground">Пробег за сегодня</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-golos font-semibold text-foreground">Пробег за сегодня</p>
+                <button
+                  onClick={() => { setAutoKmInput(autoDailyKm > 0 ? String(autoDailyKm) : ""); setShowAutoKmModal(true); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-golos font-medium transition-colors ${autoDailyKm > 0 ? "bg-accent/15 text-accent-foreground border border-accent/30" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Icon name="Repeat2" size={12} />
+                  {autoDailyKm > 0 ? `Авто: ${autoDailyKm} км/день` : "Автопробег"}
+                </button>
+              </div>
               <div className="flex gap-2 items-center">
                 <input
                   type="number" min="0" step="0.1"
@@ -866,6 +902,65 @@ export default function Index() {
         )}
 
       </main>
+
+      {/* ── Модал автопробега ── */}
+      {showAutoKmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="bg-card rounded-3xl border border-border p-6 w-full max-w-sm shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+              <Icon name="Repeat2" size={22} className="text-foreground" />
+            </div>
+            <p className="font-golos font-bold text-foreground text-base mb-1">Автоматический пробег</p>
+            <p className="text-sm text-muted-foreground font-golos leading-relaxed mb-5">
+              Каждый день при открытии приложения будет автоматически добавляться указанное количество километров.
+            </p>
+            <div className="flex gap-2 items-center mb-5">
+              <input
+                type="number" min="0" step="1"
+                value={autoKmInput}
+                onChange={(e) => setAutoKmInput(e.target.value)}
+                placeholder="150"
+                className="flex-1 bg-secondary rounded-xl px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
+              />
+              <span className="text-sm text-muted-foreground font-mono">км/день</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAutoKmModal(false)}
+                className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors"
+              >
+                Отмена
+              </button>
+              {autoDailyKm > 0 && (
+                <button
+                  onClick={() => {
+                    setAutoDailyKm(0);
+                    localStorage.removeItem("auto_daily_km");
+                    setShowAutoKmModal(false);
+                    showNotif("Автопробег отключён");
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-destructive/10 text-destructive text-sm font-golos font-medium hover:bg-destructive/20 transition-colors"
+                >
+                  Отключить
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  const val = parseFloat(autoKmInput);
+                  if (!val || val <= 0) return;
+                  setAutoDailyKm(val);
+                  localStorage.setItem("auto_daily_km", String(val));
+                  setShowAutoKmModal(false);
+                  showNotif(`Автопробег: ${val} км/день включён`);
+                }}
+                className="flex-1 py-3 rounded-xl bg-foreground text-background text-sm font-golos font-semibold hover:opacity-85 active:scale-95 transition-all"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
