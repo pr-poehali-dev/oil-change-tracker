@@ -311,7 +311,7 @@ export default function Index() {
 
       {/* Header */}
       <header className="pt-8 pb-4 px-6 max-w-md mx-auto w-full flex items-center justify-between">
-        <Logo className="w-32 h-auto" />
+        <img src="https://cdn.poehali.dev/files/e183199c-d55a-4586-9be2-0c39ea194a3a.png" alt="АвтоПилот" className="w-24 h-auto" />
         <button
           onClick={() => navigate("/settings")}
           className="w-10 h-10 flex items-center justify-center rounded-xl bg-card border border-border hover:bg-secondary transition-colors"

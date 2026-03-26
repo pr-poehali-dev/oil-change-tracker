@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
-import Logo from "@/components/Logo";
+
 
 function getTheme(): "light" | "dark" {
   return (localStorage.getItem("theme") as "light" | "dark") || "light";
@@ -30,7 +30,7 @@ export default function Settings() {
           >
             <Icon name="ChevronLeft" size={20} />
           </button>
-          <Logo className="w-28 h-auto" />
+          <img src="https://cdn.poehali.dev/files/e183199c-d55a-4586-9be2-0c39ea194a3a.png" alt="АвтоПилот" className="w-20 h-auto" />
         </div>
         <h1 className="text-lg font-golos font-bold text-foreground tracking-tight">Настройки</h1>
       </header>
