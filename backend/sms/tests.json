@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Отправка тестового SMS (тест-режим)",
+      "method": "POST",
+      "path": "/",
+      "body": "{\"to\": \"79001234567\", \"msg\": \"Тест АвтоПилот\", \"test\": 1}",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
