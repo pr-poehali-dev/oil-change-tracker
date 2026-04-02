@@ -12,7 +12,8 @@ async function authRequest(body: Record<string, unknown>) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  return { ok: res.ok, data };
+  const parsed = typeof data === "string" ? JSON.parse(data) : data;
+  return { ok: res.ok, data: parsed };
 }
 
 function formatPhone(raw: string): string {
@@ -42,9 +43,30 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [phoneFormatted, setPhoneFormatted] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [yandexLoading, setYandexLoading] = useState(false);
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Обработка callback от Яндекса (code в URL)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const yaCode = params.get("code");
+    if (yaCode) {
+      window.history.replaceState({}, "", window.location.pathname);
+      setYandexLoading(true);
+      authRequest({ action: "yandex_token", code: yaCode })
+        .then(({ ok, data }) => {
+          if (ok && data.ok) {
+            onLogin(data.token, data.phone);
+          } else {
+            setError(data.error || "Ошибка входа через Яндекс");
+          }
+        })
+        .catch(() => setError("Нет соединения"))
+        .finally(() => setYandexLoading(false));
+    }
+  }, [onLogin]);
 
   useEffect(() => {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
@@ -128,6 +150,38 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     }
   }
 
+  async function handleYandexLogin() {
+    setYandexLoading(true);
+    setError("");
+    try {
+      const { ok, data } = await authRequest({ action: "yandex_url" });
+      if (ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setError("Не удалось получить ссылку Яндекс");
+        setYandexLoading(false);
+      }
+    } catch {
+      setError("Нет соединения");
+      setYandexLoading(false);
+    }
+  }
+
+  if (yandexLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
+        <div className="text-center space-y-4">
+          <img
+            src="https://cdn.poehali.dev/files/3e44bb14-1f15-42c9-936f-974135635972.png"
+            alt="АвтоПилот"
+            className="h-16 object-contain mx-auto"
+          />
+          <p className="text-muted-foreground text-sm">Входим через Яндекс...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm">
@@ -140,36 +194,58 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         </div>
 
         {step === "phone" && (
-          <form onSubmit={handleSendCode} className="space-y-4">
+          <div className="space-y-4">
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-foreground">Вход</h1>
               <p className="text-muted-foreground mt-1 text-sm">
-                Введите номер телефона — пришлём код
+                Выберите способ входа
               </p>
             </div>
 
-            <Input
-              type="tel"
-              inputMode="numeric"
-              placeholder="+7 (___) ___-__-__"
-              value={phoneFormatted}
-              onChange={handlePhoneInput}
-              className="text-center text-lg h-12 tracking-wide"
-              autoFocus
-            />
-
-            {error && (
-              <p className="text-destructive text-sm text-center">{error}</p>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full h-12 text-base"
-              disabled={loading || phone.replace(/\D/g, "").length < 10}
+            {/* Яндекс */}
+            <button
+              type="button"
+              onClick={handleYandexLogin}
+              disabled={yandexLoading || loading}
+              className="w-full h-12 flex items-center justify-center gap-3 border border-border rounded-md bg-card hover:bg-secondary transition-colors text-sm font-medium text-foreground disabled:opacity-50"
             >
-              {loading ? "Отправляем..." : "Получить код"}
-            </Button>
-          </form>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="12" fill="#FC3F1D"/>
+                <path d="M13.48 6.4H12.2c-1.72 0-2.62.86-2.62 2.14 0 1.44.62 2.16 1.9 3.02L12.8 12.6 9.6 17.6H7.4l2.96-4.6c-1.68-1.12-2.62-2.2-2.62-4.08C7.74 6.9 9.26 5.6 12.14 5.6H15.6V17.6h-2.12V6.4z" fill="white"/>
+              </svg>
+              {yandexLoading ? "Переходим..." : "Войти через Яндекс"}
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">или</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            <form onSubmit={handleSendCode} className="space-y-3">
+              <Input
+                type="tel"
+                inputMode="numeric"
+                placeholder="+7 (___) ___-__-__"
+                value={phoneFormatted}
+                onChange={handlePhoneInput}
+                className="text-center text-lg h-12 tracking-wide"
+                autoFocus
+              />
+
+              {error && (
+                <p className="text-destructive text-sm text-center">{error}</p>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-12 text-base"
+                disabled={loading || phone.replace(/\D/g, "").length < 10}
+              >
+                {loading ? "Отправляем..." : "Войти по SMS"}
+              </Button>
+            </form>
+          </div>
         )}
 
         {step === "code" && (
@@ -217,7 +293,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               >
                 {countdown > 0 ? `Отправить повторно через ${countdown} сек` : "Отправить код ещё раз"}
               </button>
-
               <div>
                 <button
                   type="button"

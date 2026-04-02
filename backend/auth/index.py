@@ -1,9 +1,11 @@
 """
-Авторизация клиентов через SMS-код.
-POST / action=send — отправить код на номер телефона.
-POST / action=verify — проверить код, получить токен сессии.
-POST / action=check — проверить валидность токена.
-POST / action=logout — завершить сессию.
+Авторизация клиентов через SMS-код и Яндекс OAuth.
+POST / action=send — отправить OTP на телефон.
+POST / action=verify — проверить OTP, получить токен.
+POST / action=check — проверить токен.
+POST / action=logout — выйти.
+POST / action=yandex_token — обменять Яндекс code на токен сессии.
+GET  / action=yandex_url — получить URL для редиректа на Яндекс.
 """
 import json
 import os
@@ -17,6 +19,9 @@ from psycopg2.extras import RealDictCursor
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p21156567_oil_change_tracker")
 SMS_API_KEY = os.environ.get("SMS_RU_API_KEY", "")
 SMS_RU_BASE = "https://sms.ru"
+YANDEX_CLIENT_ID = os.environ.get("YANDEX_CLIENT_ID", "")
+YANDEX_CLIENT_SECRET = os.environ.get("YANDEX_CLIENT_SECRET", "")
+YANDEX_REDIRECT_URI = "https://functions.poehali.dev/942caddf-e666-440d-9d89-682d8a35bae3/yandex/callback"
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -196,4 +201,96 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"ok": True}, ensure_ascii=False),
         }
 
-    return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Укажите action: send, verify, check, logout"}, ensure_ascii=False)}
+    # action=yandex_url — получить ссылку для входа через Яндекс
+    if action == "yandex_url":
+        state = secrets.token_hex(16)
+        params = {
+            "response_type": "code",
+            "client_id": YANDEX_CLIENT_ID,
+            "redirect_uri": YANDEX_REDIRECT_URI,
+            "state": state,
+        }
+        url = "https://oauth.yandex.ru/authorize?" + urllib.parse.urlencode(params)
+        return {
+            "statusCode": 200,
+            "headers": CORS,
+            "body": json.dumps({"ok": True, "url": url, "state": state}, ensure_ascii=False),
+        }
+
+    # action=yandex_token — обменять code на токен сессии
+    if action == "yandex_token":
+        code = body.get("code", "").strip()
+        if not code:
+            return {"statusCode": 400, "headers": CORS,
+                    "body": json.dumps({"error": "Не передан code"}, ensure_ascii=False)}
+
+        # Обмениваем code на access_token Яндекса
+        token_params = urllib.parse.urlencode({
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": YANDEX_CLIENT_ID,
+            "client_secret": YANDEX_CLIENT_SECRET,
+            "redirect_uri": YANDEX_REDIRECT_URI,
+        }).encode("utf-8")
+
+        token_req = urllib.request.Request(
+            "https://oauth.yandex.ru/token",
+            data=token_params,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        try:
+            with urllib.request.urlopen(token_req, timeout=10) as resp:
+                token_data = json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            return {"statusCode": 500, "headers": CORS,
+                    "body": json.dumps({"error": f"Ошибка получения токена Яндекс: {e}"}, ensure_ascii=False)}
+
+        ya_token = token_data.get("access_token")
+        if not ya_token:
+            return {"statusCode": 400, "headers": CORS,
+                    "body": json.dumps({"error": "Яндекс не вернул токен"}, ensure_ascii=False)}
+
+        # Получаем профиль пользователя
+        info_req = urllib.request.Request(
+            "https://login.yandex.ru/info?format=json",
+            headers={"Authorization": f"OAuth {ya_token}"},
+        )
+        try:
+            with urllib.request.urlopen(info_req, timeout=10) as resp:
+                user_info = json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            return {"statusCode": 500, "headers": CORS,
+                    "body": json.dumps({"error": f"Ошибка получения профиля: {e}"}, ensure_ascii=False)}
+
+        ya_id = str(user_info.get("id", ""))
+        display_name = user_info.get("display_name") or user_info.get("login", "")
+        # Берём телефон если есть, иначе используем yandex_id как идентификатор
+        default_phone = user_info.get("default_phone", {})
+        phone = default_phone.get("number", "") if isinstance(default_phone, dict) else ""
+        identifier = phone if phone else f"yandex:{ya_id}"
+
+        # Создаём сессию
+        session_token = secrets.token_hex(32)
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.auth_sessions (phone, code, token, verified_at, expires_at)
+                VALUES (%s, %s, %s, NOW(), NOW() + INTERVAL '30 days')""",
+            (identifier, "yandex", session_token)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {
+            "statusCode": 200,
+            "headers": CORS,
+            "body": json.dumps({
+                "ok": True,
+                "token": session_token,
+                "phone": identifier,
+                "name": display_name,
+            }, ensure_ascii=False),
+        }
+
+    return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Укажите action: send, verify, check, logout, yandex_url, yandex_token"}, ensure_ascii=False)}
