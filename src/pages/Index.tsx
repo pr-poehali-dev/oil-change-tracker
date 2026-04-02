@@ -95,13 +95,16 @@ export default function Index() {
 
   // Переключение автомобиля
   useEffect(() => {
-    if (!selectedCarId) return;
+    if (!selectedCarId || !carsLoaded) return;
     localStorage.setItem(selectedCarKey(), selectedCarId);
     setActiveGuide(null);
     setOpenStep(null);
     setTab("instructions");
-    if (carsLoaded) {
-      loadEntriesForCar(selectedCarId);
+    loadEntriesForCar(selectedCarId);
+    // Автозагрузка инструкций если пусто
+    const selectedCar = customCars.find(c => c.id === selectedCarId);
+    if (selectedCar?.custom && (!selectedCar.guides || selectedCar.guides.length === 0)) {
+      setTimeout(() => handleRefreshFilters(), 300);
     }
   }, [selectedCarId, carsLoaded, loadEntriesForCar]);
 
@@ -442,6 +445,7 @@ export default function Index() {
                 setTab(t.id);
                 if (t.id !== "instructions") { setActiveGuide(null); setOpenStep(null); }
                 if (t.id === "consumables") { handleLoadConsumables(); }
+                if (t.id === "instructions" && car && (!car.guides || car.guides.length === 0)) { handleRefreshFilters(); }
               }}
               className={`flex-1 py-2 rounded-lg text-sm font-golos font-medium transition-all duration-200 ${
                 tab === t.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"

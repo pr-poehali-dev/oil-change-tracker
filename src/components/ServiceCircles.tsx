@@ -4,10 +4,10 @@ import { ServiceInterval } from "@/lib/cars";
 
 const CAR_SPECS_URL = "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23";
 
-const SIZE = 120;
-const R = 48;
+const SIZE = 100;
+const R = 40;
 const CIRC = 2 * Math.PI * R;
-const STROKE = 9;
+const STROKE = 8;
 const PER_PAGE = 3;
 
 const URGENCY_COLOR = { ok: "#4a7c59", warn: "#c9922a", danger: "#e05a2b" };
@@ -91,9 +91,10 @@ function Circle({ item, totalKm, oilInterval, onReset }: {
     <button
       onClick={onReset}
       className="flex flex-col items-center gap-2 flex-1 min-w-0 active:scale-95 transition-transform"
+      style={{ maxWidth: SIZE + 16 }}
     >
-      <div className="relative mx-auto" style={{ width: SIZE, height: SIZE }}>
-        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: "absolute", inset: 0 }}>
+      <div className="relative w-full" style={{ aspectRatio: "1 / 1", maxWidth: SIZE }}>
+        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
           <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="hsl(var(--secondary))" strokeWidth={STROKE} />
           <circle
             cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none"
@@ -123,10 +124,10 @@ function Circle({ item, totalKm, oilInterval, onReset }: {
           )}
         </div>
       </div>
-      <div className="text-center space-y-0.5">
-        <p className="text-xs font-golos font-semibold text-foreground leading-tight">{item.name}</p>
-        <p className="text-xs font-mono leading-tight" style={{ color }}>{mainLabel}</p>
-        <p className="text-xs font-mono text-muted-foreground leading-tight">{subLabel}</p>
+      <div className="text-center space-y-0.5 w-full px-1">
+        <p className="text-xs font-golos font-semibold text-foreground leading-tight truncate">{item.name}</p>
+        <p className="text-xs font-mono leading-tight truncate" style={{ color }}>{mainLabel}</p>
+        <p className="text-xs font-mono text-muted-foreground leading-tight truncate">{subLabel}</p>
       </div>
     </button>
   );
