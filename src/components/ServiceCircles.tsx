@@ -200,14 +200,15 @@ export default function ServiceCircles({
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
           <div className="bg-card rounded-3xl border border-border p-6 w-full max-w-sm shadow-xl">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4" style={{ background: resetTarget.color + "20" }}>
-              <Icon name={resetTarget.icon as "Droplets"} size={22} style={{ color: resetTarget.color }} fallback="Wrench" />
+            {/* Заголовок — название круга */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background: resetTarget.color + "20" }}>
+                <Icon name={resetTarget.icon as "Droplets"} size={20} style={{ color: resetTarget.color }} fallback="Wrench" />
+              </div>
+              <p className="font-golos font-bold text-foreground text-lg leading-tight">{resetTarget.name}</p>
             </div>
-            <p className="font-golos font-bold text-foreground text-base mb-2">
-              Сбросить данные: <span style={{ color: resetTarget.color }}>{resetTarget.name}</span>
-            </p>
 
-            <div className="space-y-3 mb-5">
+            <div className="space-y-3">
               <div>
                 <label className="block text-xs font-golos text-muted-foreground mb-1">Дата замены</label>
                 <input
@@ -233,18 +234,24 @@ export default function ServiceCircles({
               )}
             </div>
 
-            <div className="flex gap-2">
-              <button onClick={() => setResetTarget(null)} className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium">Отмена</button>
+            {/* Кнопки */}
+            <div className="mt-5 space-y-2">
               <button
                 onClick={() => {
                   const km = resetTarget.unit === "km" ? (parseFloat(resetKm) || totalKm) : totalKm;
                   onIntervalReset(resetTarget.id, resetDate, km);
                   setResetTarget(null);
                 }}
-                className="flex-1 py-3 rounded-xl text-white text-sm font-golos font-semibold"
+                className="w-full py-3 rounded-xl text-white text-sm font-golos font-semibold"
                 style={{ background: resetTarget.color }}
               >
-                Сохранить
+                Сбросить данные: {resetTarget.name}
+              </button>
+              <button
+                onClick={() => setResetTarget(null)}
+                className="w-full py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium"
+              >
+                Отмена
               </button>
             </div>
           </div>
