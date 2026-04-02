@@ -76,7 +76,7 @@ export default function Index() {
 
   // Загрузка кастомных авто из БД
   useEffect(() => {
-    apiGetCars().then((cars: Array<CarConfig & { specs?: [string,string][] }>) => {
+    apiGetCars().then((cars: Array<CarConfig & { specs?: [string,string][], serviceIntervals?: ServiceInterval[] }>) => {
       setCustomCars(cars.map(({ specs: _specs, ...c }) => c));
       const specsMap: Record<string, [string,string][]> = {};
       cars.forEach((c) => { if (c.specs?.length) specsMap[c.id] = c.specs; });
