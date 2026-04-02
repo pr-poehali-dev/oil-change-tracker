@@ -258,16 +258,14 @@ export default function Index() {
     await apiUpdateCar(car.id, { serviceIntervals: intervals }).catch(() => {});
   }
 
-  async function handleIntervalReset(intervalId: string) {
+  async function handleIntervalReset(intervalId: string, date: string, km: number) {
     if (!car) return;
-    // Масло — сбрасываем основной счётчик пробега
     if (intervalId === "__oil__") {
       setConfirmReset(true);
       return;
     }
-    const today = getTodayStr();
     const updated = (car.serviceIntervals ?? []).map((s) =>
-      s.id === intervalId ? { ...s, last_km: totalKm, last_date: today } : s
+      s.id === intervalId ? { ...s, last_km: km, last_date: date } : s
     );
     setCustomCars((prev) =>
       prev.map((c) => c.id === car.id ? { ...c, serviceIntervals: updated } : c)

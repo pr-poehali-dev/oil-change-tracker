@@ -22,7 +22,7 @@ interface Props {
   oilInterval: number;
   intervals: ServiceInterval[];
   onIntervalsLoaded: (intervals: ServiceInterval[]) => void;
-  onIntervalReset: (id: string) => void;
+  onIntervalReset: (id: string, date: string, km: number) => void;
 }
 
 function getProgress(item: ServiceInterval, totalKm: number): number {
@@ -140,8 +140,16 @@ export default function ServiceCircles({
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [resetTarget, setResetTarget] = useState<ServiceInterval | null>(null);
+  const [resetDate, setResetDate] = useState("");
+  const [resetKm, setResetKm] = useState("");
   const [page, setPage] = useState(0);
   const touchStartX = useRef<number | null>(null);
+
+  function openReset(item: ServiceInterval) {
+    setResetTarget(item);
+    setResetDate(new Date().toISOString().split("T")[0]);
+    setResetKm(String(totalKm));
+  }
 
   // Масляный круг всегда первый
   const oilItem: ServiceInterval = {
@@ -162,7 +170,7 @@ export default function ServiceCircles({
     if (item.id === "__oil__") {
       onIntervalReset("__oil__");
     } else {
-      setResetTarget(item);
+      openReset(item);
     }
   }
 
@@ -194,18 +202,48 @@ export default function ServiceCircles({
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4" style={{ background: resetTarget.color + "20" }}>
               <Icon name={resetTarget.icon as "Droplets"} size={22} style={{ color: resetTarget.color }} fallback="Wrench" />
             </div>
-            <p className="font-golos font-bold text-foreground text-base mb-1">Замена выполнена?</p>
-            <p className="text-sm text-muted-foreground font-golos leading-relaxed mb-5">
-              Подтверди замену <span className="text-foreground font-medium">{resetTarget.name}</span>. Счётчик обнулится от текущего пробега и даты.
+            <p className="font-golos font-bold text-foreground text-base mb-2">
+              Замена: <span style={{ color: resetTarget.color }}>{resetTarget.name}</span>
             </p>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="block text-xs font-golos text-muted-foreground mb-1">Дата замены</label>
+                <input
+                  type="date"
+                  value={resetDate}
+                  max={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setResetDate(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              {resetTarget.unit === "km" && (
+                <div>
+                  <label className="block text-xs font-golos text-muted-foreground mb-1">Пробег при замене, км</label>
+                  <input
+                    type="number"
+                    value={resetKm}
+                    min={0}
+                    onChange={(e) => setResetKm(e.target.value)}
+                    className="w-full px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder={String(totalKm)}
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <button onClick={() => setResetTarget(null)} className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium">Отмена</button>
               <button
-                onClick={() => { onIntervalReset(resetTarget.id); setResetTarget(null); }}
+                onClick={() => {
+                  const km = resetTarget.unit === "km" ? (parseFloat(resetKm) || totalKm) : totalKm;
+                  onIntervalReset(resetTarget.id, resetDate, km);
+                  setResetTarget(null);
+                }}
                 className="flex-1 py-3 rounded-xl text-white text-sm font-golos font-semibold"
                 style={{ background: resetTarget.color }}
               >
-                Заменено!
+                Сохранить
               </button>
             </div>
           </div>
