@@ -260,6 +260,11 @@ export default function Index() {
 
   async function handleIntervalReset(intervalId: string) {
     if (!car) return;
+    // Масло — сбрасываем основной счётчик пробега
+    if (intervalId === "__oil__") {
+      setConfirmReset(true);
+      return;
+    }
     const today = getTodayStr();
     const updated = (car.serviceIntervals ?? []).map((s) =>
       s.id === intervalId ? { ...s, last_km: totalKm, last_date: today } : s
@@ -501,50 +506,6 @@ export default function Index() {
         {/* ── СЧЁТЧИК ── */}
         {tab === "counter" && (
           <div className="animate-fade-in space-y-4">
-            <div className="bg-card rounded-3xl p-8 flex flex-col items-center border border-border">
-              <div className="relative" style={{ width: 128, height: 128 }}>
-                <svg width="128" height="128" viewBox="0 0 128 128" style={{ position: "absolute", top: 0, left: 0 }}>
-                  <circle cx="64" cy="64" r="54" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
-                  <circle
-                    cx="64" cy="64" r="54" fill="none"
-                    stroke={urgencyColor} strokeWidth="10" strokeLinecap="round"
-                    strokeDasharray={circumference} strokeDashoffset={dash}
-                    transform="rotate(-90 64 64)"
-                    style={{ transition: "stroke-dashoffset 0.6s ease, stroke 0.4s ease" }}
-                  />
-                </svg>
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                  <span className="font-mono text-2xl font-medium text-foreground leading-none">{totalKm.toLocaleString("ru-RU")}</span>
-                  <span className="text-xs font-mono text-muted-foreground mt-1">из {OIL_INTERVAL.toLocaleString("ru-RU")}</span>
-                </div>
-              </div>
-
-              <div className="w-full border-t border-border pt-5 mt-5 flex justify-between items-center">
-                <div>
-                  <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">До замены</p>
-                  <p className="text-xl font-mono font-medium mt-0.5" style={{ color: urgencyColor }}>
-                    {remaining > 0 ? `${remaining.toLocaleString("ru-RU")} км` : "0 км"}
-                  </p>
-                </div>
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: urgencyColor + "20" }}>
-                  <Icon name={urgency === "danger" ? "AlertTriangle" : urgency === "warn" ? "AlertCircle" : "CheckCircle2"} size={20} style={{ color: urgencyColor }} />
-                </div>
-              </div>
-
-              {remaining <= 300 && remaining > 0 && (
-                <div className="w-full mt-4 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3">
-                  <Icon name="AlertCircle" size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-sm font-golos text-amber-800 leading-snug">Допустимая норма пробега скоро закончится. Замените масло.</p>
-                </div>
-              )}
-              {remaining === 0 && (
-                <div className="w-full mt-4 flex items-start gap-3 bg-red-50 border border-red-400 rounded-2xl px-4 py-3">
-                  <Icon name="AlertTriangle" size={18} className="text-red-600 shrink-0 mt-0.5" />
-                  <p className="text-sm font-golos font-semibold text-red-700 leading-snug">Эксплуатация автомобиля небезопасна! Замените масло.</p>
-                </div>
-              )}
-            </div>
-
             {car && (
               <ServiceCircles
                 carId={car.id}
@@ -553,6 +514,7 @@ export default function Index() {
                 year={car.year}
                 engine={car.engine}
                 totalKm={totalKm}
+                oilInterval={OIL_INTERVAL}
                 intervals={car.serviceIntervals ?? []}
                 onIntervalsLoaded={handleIntervalsLoaded}
                 onIntervalReset={handleIntervalReset}
