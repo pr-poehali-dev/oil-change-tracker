@@ -204,7 +204,7 @@ export default function ServiceCircles({
               <Icon name={resetTarget.icon as "Droplets"} size={22} style={{ color: resetTarget.color }} fallback="Wrench" />
             </div>
             <p className="font-golos font-bold text-foreground text-base mb-2">
-              Замена: <span style={{ color: resetTarget.color }}>{resetTarget.name}</span>
+              Сбросить данные: <span style={{ color: resetTarget.color }}>{resetTarget.name}</span>
             </p>
 
             <div className="space-y-3 mb-5">
