@@ -52,16 +52,42 @@ def handler(event: dict, context) -> dict:
             ORDER BY c.created_at
         """, (user_id,))
         rows = cur.fetchall()
+
+        # Загружаем персональные замены пользователя
+        car_ids = [row[0] for row in rows]
+        resets_map = {}
+        if car_ids:
+            placeholders = ','.join(['%s'] * len(car_ids))
+            cur.execute(f"""
+                SELECT car_id, interval_id, last_km, last_date
+                FROM service_resets
+                WHERE car_id IN ({placeholders}) AND user_id = %s
+            """, car_ids + [user_id])
+            for r in cur.fetchall():
+                resets_map.setdefault(r[0], {})[r[1]] = {
+                    'last_km': r[2], 'last_date': str(r[3]) if r[3] else None
+                }
         conn.close()
+
         cars = []
         for row in rows:
+            car_id = row[0]
+            base_intervals = row[10] if row[10] is not None else []
+            user_resets = resets_map.get(car_id, {})
+            # Подмешиваем персональные даты/км в каждый интервал
+            merged = []
+            for interval in base_intervals:
+                iid = interval.get('id')
+                if iid and iid in user_resets:
+                    interval = {**interval, **user_resets[iid]}
+                merged.append(interval)
             cars.append({
-                'id': row[0], 'brand': row[1], 'model': row[2], 'year': row[3],
+                'id': car_id, 'brand': row[1], 'model': row[2], 'year': row[3],
                 'oilInterval': row[4], 'guides': row[5] if row[5] is not None else [],
                 'custom': row[6], 'specs': row[7] if row[7] is not None else [],
                 'filters': row[8] if row[8] is not None else [],
                 'consumables': row[9] if row[9] is not None else [],
-                'serviceIntervals': row[10] if row[10] is not None else [],
+                'serviceIntervals': merged,
             })
         return resp(200, cars)
 
@@ -103,7 +129,10 @@ def handler(event: dict, context) -> dict:
             if 'consumables' in body:
                 fields.append('consumables = %s'); values.append(json.dumps(body['consumables'], ensure_ascii=False))
             if 'serviceIntervals' in body:
-                fields.append('service_intervals = %s'); values.append(json.dumps(body['serviceIntervals'], ensure_ascii=False))
+                # Сохраняем базовую структуру (без last_km/last_date) в общую таблицу
+                base = [{k: v for k, v in s.items() if k not in ('last_km', 'last_date')}
+                        for s in body['serviceIntervals']]
+                fields.append('service_intervals = %s'); values.append(json.dumps(base, ensure_ascii=False))
             conn = get_conn()
             cur = conn.cursor()
             if fields:
@@ -156,6 +185,23 @@ def handler(event: dict, context) -> dict:
             cur = conn.cursor()
             cur.execute("DELETE FROM car_entries WHERE car_id = %s AND entry_date = %s",
                         (body['carId'], body['date']))
+            conn.commit()
+            conn.close()
+            return resp(200, {'ok': True})
+
+        if action == 'save_reset':
+            car_id = body['carId']
+            interval_id = body['intervalId']
+            last_km = body.get('lastKm')
+            last_date = body.get('lastDate')
+            conn = get_conn()
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO service_resets (car_id, user_id, interval_id, last_km, last_date)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (car_id, user_id, interval_id)
+                DO UPDATE SET last_km = EXCLUDED.last_km, last_date = EXCLUDED.last_date
+            """, (car_id, user_id, interval_id, last_km, last_date))
             conn.commit()
             conn.close()
             return resp(200, {'ok': True})

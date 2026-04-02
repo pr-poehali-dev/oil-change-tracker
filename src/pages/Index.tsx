@@ -10,7 +10,7 @@ import {
 import ServiceCircles from "@/components/ServiceCircles";
 import {
   apiGetCars, apiCreateCar, apiDeleteCar, apiUpdateCar,
-  apiGetEntries, apiSaveEntry, apiDeleteEntry,
+  apiGetEntries, apiSaveEntry, apiDeleteEntry, apiSaveReset,
 } from "@/api";
 import AddCarModal from "@/components/AddCarModal";
 import AddGuideModal from "@/components/AddGuideModal";
@@ -264,13 +264,15 @@ export default function Index() {
       setConfirmReset(true);
       return;
     }
+    // Обновляем локальный стейт
     const updated = (car.serviceIntervals ?? []).map((s) =>
       s.id === intervalId ? { ...s, last_km: km, last_date: date } : s
     );
     setCustomCars((prev) =>
       prev.map((c) => c.id === car.id ? { ...c, serviceIntervals: updated } : c)
     );
-    await apiUpdateCar(car.id, { serviceIntervals: updated }).catch(() => {});
+    // Сохраняем персональную замену в отдельную таблицу
+    await apiSaveReset(car.id, intervalId, date, km).catch(() => {});
     showNotif("Замена зафиксирована!");
   }
 

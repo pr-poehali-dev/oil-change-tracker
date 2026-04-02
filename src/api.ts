@@ -62,6 +62,8 @@ export const apiSearchCar = (brand: string, model: string, year: string) => cars
 export const apiGetEntries = (carId: string) => carsPost({ action: "get_entries", carId });
 export const apiSaveEntry = (carId: string, date: string, km: number) => carsPost({ action: "save_entry", carId, date, km });
 export const apiDeleteEntry = (carId: string, date: string) => carsPost({ action: "delete_entry", carId, date });
+export const apiSaveReset = (carId: string, intervalId: string, lastDate: string, lastKm: number | null) =>
+  carsPost({ action: "save_reset", carId, intervalId, lastDate, lastKm });
 
 // Documents
 export const apiGetDocuments = (params?: { type?: string }) => {
