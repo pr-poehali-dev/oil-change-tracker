@@ -4,10 +4,10 @@ import { ServiceInterval } from "@/lib/cars";
 
 const CAR_SPECS_URL = "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23";
 
-const SIZE = 110;
-const R = 44;
+const SIZE = 130;
+const R = 52;
 const CIRC = 2 * Math.PI * R;
-const STROKE = 8;
+const STROKE = 9;
 const PER_PAGE = 3;
 
 const URGENCY_COLOR = { ok: "#4a7c59", warn: "#c9922a", danger: "#e05a2b" };

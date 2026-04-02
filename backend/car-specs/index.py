@@ -85,18 +85,27 @@ def handler(event: dict, context) -> dict:
                 print(f"Cache hit intervals: {car_id}")
                 return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'intervals': cached}, ensure_ascii=False)}
 
-        prompt = f"""Все жидкости и расходники {car}{eng} с интервалами замены. JSON без markdown:
+        prompt = f"""Полный регламент ТО для {car}{eng} — все жидкости и фильтры с реальными интервалами замены по заводскому регламенту. JSON без markdown:
 {{"intervals":[
-{{"id":"oil","name":"Масло","icon":"Droplets","color":"#e05a2b","interval_km":10000,"interval_months":12,"unit":"km"}},
-{{"id":"washer","name":"Омывайка","icon":"Droplets","color":"#3b82f6","interval_km":null,"interval_months":3,"unit":"months"}},
-{{"id":"air_filter","name":"Воздушный фильтр","icon":"Wind","color":"#10b981","interval_km":30000,"interval_months":null,"unit":"km"}},
-{{"id":"cabin_filter","name":"Салонный фильтр","icon":"Wind","color":"#8b5cf6","interval_km":15000,"interval_months":null,"unit":"km"}},
-{{"id":"brake_fluid","name":"Тормозная жидкость","icon":"AlertTriangle","color":"#f59e0b","interval_km":null,"interval_months":24,"unit":"months"}},
+{{"id":"oil","name":"Масло мотор","icon":"Droplets","color":"#e05a2b","interval_km":10000,"interval_months":12,"unit":"km"}},
+{{"id":"atf","name":"Масло АКПП","icon":"Settings","color":"#f97316","interval_km":60000,"interval_months":null,"unit":"km"}},
+{{"id":"gear_oil","name":"Масло КПП","icon":"Cog","color":"#84cc16","interval_km":60000,"interval_months":null,"unit":"km"}},
+{{"id":"transfer","name":"Масло раздатки","icon":"GitFork","color":"#a78bfa","interval_km":60000,"interval_months":null,"unit":"km"}},
+{{"id":"diff_front","name":"Масло дифф. пер.","icon":"Circle","color":"#fb923c","interval_km":60000,"interval_months":null,"unit":"km"}},
+{{"id":"diff_rear","name":"Масло дифф. зад.","icon":"Circle","color":"#f43f5e","interval_km":60000,"interval_months":null,"unit":"km"}},
+{{"id":"power_steering","name":"Жидкость ГУР","icon":"Gauge","color":"#38bdf8","interval_km":null,"interval_months":36,"unit":"months"}},
+{{"id":"brake_fluid","name":"Тормозная жидк.","icon":"AlertTriangle","color":"#f59e0b","interval_km":null,"interval_months":24,"unit":"months"}},
 {{"id":"coolant","name":"Антифриз","icon":"Thermometer","color":"#06b6d4","interval_km":null,"interval_months":60,"unit":"months"}},
-{{"id":"spark","name":"Свечи","icon":"Zap","color":"#f97316","interval_km":60000,"interval_months":null,"unit":"km"}}
+{{"id":"air_filter","name":"Возд. фильтр","icon":"Wind","color":"#10b981","interval_km":30000,"interval_months":null,"unit":"km"}},
+{{"id":"cabin_filter","name":"Салон. фильтр","icon":"Wind","color":"#8b5cf6","interval_km":15000,"interval_months":null,"unit":"km"}},
+{{"id":"spark","name":"Свечи","icon":"Zap","color":"#eab308","interval_km":60000,"interval_months":null,"unit":"km"}},
+{{"id":"washer","name":"Омывайка","icon":"Droplets","color":"#3b82f6","interval_km":null,"interval_months":3,"unit":"months"}}
 ]}}
-Поля: id(уникальный), name(русское название), icon(lucide), color(hex), interval_km(число или null), interval_months(число или null), unit(km или months — основная единица).
-Верни 6-10 позиций актуальных для {car}. Реальные интервалы по регламенту."""
+Правила:
+- Включай ТОЛЬКО позиции актуальные для {car} (например масло АКПП — только если есть АКПП, ГУР — только если есть ГУР, раздатка/диффы — только если полный привод)
+- Реальные интервалы строго по заводскому регламенту
+- Поля: id(уникальный), name(короткое русское до 14 символов), icon(lucide-react), color(hex), interval_km(число или null), interval_months(число или null), unit(km или months)
+- Верни 8-14 позиций"""
 
         result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
         intervals = result.get('intervals', [])
