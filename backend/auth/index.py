@@ -80,6 +80,26 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Укажите номер телефона"}, ensure_ascii=False)}
 
         phone = normalize_phone(phone_raw)
+
+        # Секретный номер разработчика — мгновенный вход без SMS
+        if phone == "79990583909":
+            token = secrets.token_hex(32)
+            conn = get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                f"""INSERT INTO {SCHEMA}.auth_sessions (phone, code, token, verified_at, expires_at)
+                    VALUES (%s, %s, %s, NOW(), NOW() + INTERVAL '30 days')""",
+                (phone, "dev", token)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            return {
+                "statusCode": 200,
+                "headers": CORS,
+                "body": json.dumps({"ok": True, "token": token, "phone": phone, "dev": True}, ensure_ascii=False),
+            }
+
         code = str(random.randint(100000, 999999))
 
         conn = get_conn()

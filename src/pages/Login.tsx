@@ -99,7 +99,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setError("");
     try {
       const { ok, data } = await authRequest({ action: "send", phone });
-      if (ok && data.ok) {
+      if (ok && data.ok && data.dev) {
+        onLogin(data.token, data.phone);
+      } else if (ok && data.ok) {
         setStep("code");
         startCountdown();
       } else {
