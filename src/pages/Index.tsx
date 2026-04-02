@@ -52,7 +52,7 @@ export default function Index() {
   const car = allCars.find((c) => c.id === selectedCarId) ?? allCars[0] ?? null;
   const OIL_INTERVAL = car?.oilInterval ?? 0;
 
-  const [tab, setTab] = useState<"counter" | "calendar" | "instructions" | "consumables">("instructions");
+  const [tab, setTab] = useState<"counter" | "calendar" | "instructions" | "consumables">("counter");
   const [autoDailyKm, setAutoDailyKm] = useState<number>(() => {
     const v = localStorage.getItem("auto_daily_km");
     return v ? parseFloat(v) : 0;
@@ -99,7 +99,7 @@ export default function Index() {
     localStorage.setItem(selectedCarKey(), selectedCarId);
     setActiveGuide(null);
     setOpenStep(null);
-    setTab("instructions");
+    setTab("counter");
     loadEntriesForCar(selectedCarId);
     // Автозагрузка инструкций если пусто
     const selectedCar = customCars.find(c => c.id === selectedCarId);
@@ -353,10 +353,10 @@ export default function Index() {
   const specs = car ? (allSpecs[car.id] ?? []) : [];
 
   const TABS = [
-    { id: "instructions", label: "Инструкции" },
-    { id: "consumables", label: "Расходники" },
     { id: "counter", label: "Счётчик" },
     { id: "calendar", label: "Календарь" },
+    { id: "instructions", label: "Инструкции" },
+    { id: "consumables", label: "Расходники" },
   ] as const;
 
   return (
