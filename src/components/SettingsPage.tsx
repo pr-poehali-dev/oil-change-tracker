@@ -1,7 +1,9 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { useAuth } from "@/lib/auth";
 
 export default function SettingsPage() {
+  const { user, logout } = useAuth();
   const [smsEnabled, setSmsEnabled] = useState(true);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [remindBefore, setRemindBefore] = useState("24");
@@ -142,6 +144,29 @@ export default function SettingsPage() {
       <button className="bg-primary text-primary-foreground px-6 py-2.5 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
         Сохранить настройки
       </button>
+
+      {/* Profile */}
+      <section className="bg-card border border-border rounded-lg mt-6 overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border bg-secondary/40">
+          <h2 className="font-medium text-sm text-foreground flex items-center gap-2">
+            <Icon name="User" size={15} className="text-muted-foreground" fallback="User" />
+            Профиль
+          </h2>
+        </div>
+        <div className="px-5 py-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-foreground">{user?.phone ? `+${user.phone}` : "—"}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Номер телефона для входа</div>
+          </div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-destructive border border-destructive/30 rounded-md hover:bg-destructive/10 transition-colors"
+          >
+            <Icon name="LogOut" size={15} fallback="LogOut" />
+            Выйти
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import LoginPage from "./pages/Login";
+import { AuthContext, AuthUser } from "./lib/auth";
 
 const AUTH_URL = "https://functions.poehali.dev/942caddf-e666-440d-9d89-682d8a35bae3";
 
@@ -100,29 +101,39 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
 const App = () => {
   const [splash, setSplash] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    if (!token) {
-      setAuthChecked(true);
-      return;
-    }
+    const phone = localStorage.getItem("auth_phone") || "";
+    if (!token) { setAuthChecked(true); return; }
     checkToken(token).then(valid => {
-      setIsLoggedIn(valid);
-      if (!valid) localStorage.removeItem("auth_token");
+      if (valid) setUser({ token, phone });
+      else { localStorage.removeItem("auth_token"); localStorage.removeItem("auth_phone"); }
       setAuthChecked(true);
     });
   }, []);
 
-  function handleLogin(token: string) {
+  function handleLogin(token: string, phone: string) {
     localStorage.setItem("auth_token", token);
-    setIsLoggedIn(true);
+    localStorage.setItem("auth_phone", phone);
+    setUser({ token, phone });
+  }
+
+  function handleLogout() {
+    fetch(AUTH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "logout", token: user?.token }),
+    }).catch(() => {});
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_phone");
+    setUser(null);
   }
 
   if (!authChecked) return null;
 
-  if (!isLoggedIn) {
+  if (!user) {
     return (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
@@ -135,22 +146,24 @@ const App = () => {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        {splash && <SplashScreen onDone={() => setSplash(false)} />}
-        <IOSInstallBanner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/settings" element={<Settings />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <AuthContext.Provider value={{ user, logout: handleLogout }}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          {splash && <SplashScreen onDone={() => setSplash(false)} />}
+          <IOSInstallBanner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/settings" element={<Settings />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </AuthContext.Provider>
   );
 };
 
