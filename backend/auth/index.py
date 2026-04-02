@@ -21,7 +21,7 @@ SMS_API_KEY = os.environ.get("SMS_RU_API_KEY", "")
 SMS_RU_BASE = "https://sms.ru"
 YANDEX_CLIENT_ID = os.environ.get("YANDEX_CLIENT_ID", "")
 YANDEX_CLIENT_SECRET = os.environ.get("YANDEX_CLIENT_SECRET", "")
-YANDEX_REDIRECT_URI = "https://functions.poehali.dev/942caddf-e666-440d-9d89-682d8a35bae3/yandex/callback"
+YANDEX_REDIRECT_URI = "https://oil-change-tracker--preview.poehali.dev/"
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
