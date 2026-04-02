@@ -4,8 +4,8 @@ import { ServiceInterval } from "@/lib/cars";
 
 const CAR_SPECS_URL = "https://functions.poehali.dev/ad7fb5e8-5daf-45c5-9628-b46b7e92ee23";
 
-const SIZE = 130;
-const R = 52;
+const SIZE = 120;
+const R = 48;
 const CIRC = 2 * Math.PI * R;
 const STROKE = 9;
 const PER_PAGE = 3;
@@ -309,7 +309,7 @@ export default function ServiceCircles({
             {Array.from({ length: totalPages }).map((_, pageIdx) => {
               const items = allItems.slice(pageIdx * PER_PAGE, pageIdx * PER_PAGE + PER_PAGE);
               return (
-                <div key={pageIdx} className="flex justify-around items-start py-2 shrink-0 w-full">
+                <div key={pageIdx} className="flex justify-between items-start py-2 px-2 shrink-0 w-full">
                   {items.map((item) => (
                     <Circle
                       key={item.id}

@@ -537,10 +537,10 @@ export default function Index() {
                   onChange={(e) => setDailyInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddKm()}
                   placeholder="0"
-                  className="flex-1 bg-secondary rounded-xl px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
+                  className="min-w-0 flex-1 bg-secondary rounded-xl px-3 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
                 />
-                <span className="text-sm text-muted-foreground font-mono">км</span>
-                <button onClick={handleAddKm} className="bg-foreground text-background rounded-xl px-5 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all">Добавить</button>
+                <span className="text-sm text-muted-foreground font-mono shrink-0">км</span>
+                <button onClick={handleAddKm} className="shrink-0 bg-foreground text-background rounded-xl px-4 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all">Добавить</button>
               </div>
             </div>
 
