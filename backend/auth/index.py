@@ -119,10 +119,12 @@ def handler(event: dict, context) -> dict:
 
         try:
             sms_result = send_sms(phone, f"АвтоПилот: ваш код входа {code}")
+            print(f"SMS result: {sms_result}")
             sms_ok = sms_result.get("status") == "OK"
         except Exception as e:
             sms_ok = False
             sms_result = {"error": str(e)}
+            print(f"SMS exception: {e}")
 
         if not sms_ok:
             return {
