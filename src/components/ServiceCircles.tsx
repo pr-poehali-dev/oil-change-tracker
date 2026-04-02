@@ -64,6 +64,17 @@ const SIZE = 88;
 const R = 36;
 const CIRC = 2 * Math.PI * R;
 
+function getLastLabel(item: ServiceInterval): string {
+  if (item.unit === "km" && item.last_km != null) {
+    return `с ${item.last_km.toLocaleString("ru-RU")} км`;
+  }
+  if (item.last_date) {
+    const d = new Date(item.last_date);
+    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  }
+  return "не задано";
+}
+
 function Circle({ item, totalKm, onReset }: { item: ServiceInterval; totalKm: number; onReset: () => void }) {
   const progress = getProgress(item, totalKm);
   const urgency = getUrgency(progress);
@@ -71,11 +82,12 @@ function Circle({ item, totalKm, onReset }: { item: ServiceInterval; totalKm: nu
   const dash = CIRC * (1 - progress);
   const remaining = getRemaining(item, totalKm);
   const isDanger = urgency === "danger";
+  const lastLabel = getLastLabel(item);
 
   return (
     <button
       onClick={onReset}
-      className="flex flex-col items-center gap-2 shrink-0 active:scale-95 transition-transform"
+      className="flex flex-col items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
       style={{ width: SIZE + 16 }}
       title={`${item.name} — нажмите чтобы сбросить`}
     >
@@ -97,9 +109,10 @@ function Circle({ item, totalKm, onReset }: { item: ServiceInterval; totalKm: nu
           )}
         </div>
       </div>
-      <div className="text-center">
+      <div className="text-center space-y-0.5">
         <p className="text-xs font-golos font-medium text-foreground leading-tight">{item.name}</p>
         <p className="text-xs font-mono leading-tight" style={{ color }}>{remaining}</p>
+        <p className="text-xs font-mono text-muted-foreground leading-tight">{lastLabel}</p>
       </div>
     </button>
   );
@@ -200,8 +213,8 @@ export default function ServiceCircles({ carId, brand, model, year, engine, tota
           </button>
         </div>
 
-        <div className="overflow-x-auto -mx-1 px-1">
-          <div className="flex gap-3 pb-2" style={{ minWidth: "max-content" }}>
+        <div className="overflow-x-auto -mx-1 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="flex gap-3 pb-1" style={{ minWidth: "max-content" }}>
             {intervals.map((item) => (
               <Circle
                 key={item.id}
