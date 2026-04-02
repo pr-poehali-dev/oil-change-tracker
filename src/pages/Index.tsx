@@ -260,10 +260,6 @@ export default function Index() {
 
   async function handleIntervalReset(intervalId: string, date: string, km: number) {
     if (!car) return;
-    if (intervalId === "__oil__") {
-      setConfirmReset(true);
-      return;
-    }
     // Обновляем локальный стейт
     const updated = (car.serviceIntervals ?? []).map((s) =>
       s.id === intervalId ? { ...s, last_km: km, last_date: date } : s
@@ -548,21 +544,21 @@ export default function Index() {
 
             <button
               onClick={() => setConfirmReset(true)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-border text-muted-foreground text-sm font-golos hover:text-foreground hover:border-muted-foreground active:scale-95 transition-all"
+            >
+              <Icon name="RotateCcw" size={15} />
+              Сбросить пробег масла
+            </button>
+
+            <button
+              onClick={() => setConfirmDeleteCar(true)}
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-destructive/30 bg-destructive/5 text-destructive text-sm font-golos font-semibold hover:bg-destructive/10 hover:border-destructive/50 active:scale-95 transition-all"
             >
-              <Icon name="RotateCcw" size={15} className="text-destructive" />
+              <Icon name="Trash2" size={15} className="text-destructive" />
               Сбросить все данные об автомобиле
             </button>
 
-            {car?.custom && (
-              <button
-                onClick={() => setConfirmDeleteCar(true)}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-border text-muted-foreground text-sm font-golos hover:text-destructive hover:border-destructive/30 active:scale-95 transition-all"
-              >
-                <Icon name="Trash2" size={15} />
-                Удалить этот автомобиль
-              </button>
-            )}
+
           </div>
         )}
 

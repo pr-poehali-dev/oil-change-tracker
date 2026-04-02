@@ -90,10 +90,9 @@ function Circle({ item, totalKm, oilInterval, onReset }: {
   return (
     <button
       onClick={onReset}
-      className="flex flex-col items-center gap-2 shrink-0 active:scale-95 transition-transform"
-      style={{ width: SIZE + 8 }}
+      className="flex flex-col items-center gap-2 flex-1 min-w-0 active:scale-95 transition-transform"
     >
-      <div className="relative" style={{ width: SIZE, height: SIZE }}>
+      <div className="relative mx-auto" style={{ width: SIZE, height: SIZE }}>
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: "absolute", inset: 0 }}>
           <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="hsl(var(--secondary))" strokeWidth={STROKE} />
           <circle
@@ -170,11 +169,7 @@ export default function ServiceCircles({
   const pageItems = allItems.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
 
   function handleReset(item: ServiceInterval) {
-    if (item.id === "__oil__") {
-      onIntervalReset("__oil__");
-    } else {
-      openReset(item);
-    }
+    openReset(item);
   }
 
   function handleSwipeEnd(dx: number) {
@@ -309,7 +304,7 @@ export default function ServiceCircles({
             {Array.from({ length: totalPages }).map((_, pageIdx) => {
               const items = allItems.slice(pageIdx * PER_PAGE, pageIdx * PER_PAGE + PER_PAGE);
               return (
-                <div key={pageIdx} className="flex justify-between items-start py-2 px-2 shrink-0 w-full">
+                <div key={pageIdx} className="flex items-start py-2 gap-1 shrink-0 w-full">
                   {items.map((item) => (
                     <Circle
                       key={item.id}
@@ -320,7 +315,7 @@ export default function ServiceCircles({
                     />
                   ))}
                   {items.length < PER_PAGE && Array.from({ length: PER_PAGE - items.length }).map((_, i) => (
-                    <div key={`empty-${i}`} style={{ width: SIZE + 8 }} />
+                    <div key={`empty-${i}`} className="flex-1" />
                   ))}
                 </div>
               );
