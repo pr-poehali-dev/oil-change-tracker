@@ -8,6 +8,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import LoginPage from "./pages/Login";
+
+const AUTH_URL = "https://functions.poehali.dev/942caddf-e666-440d-9d89-682d8a35bae3";
 
 
 const queryClient = new QueryClient();
@@ -15,6 +18,21 @@ const queryClient = new QueryClient();
 const savedTheme = localStorage.getItem("theme");
 if (savedTheme === "dark") {
   document.documentElement.classList.add("dark");
+}
+
+async function checkToken(token: string): Promise<boolean> {
+  try {
+    const res = await fetch(AUTH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "check", token }),
+    });
+    const data = await res.json();
+    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    return parsed?.ok === true;
+  } catch {
+    return false;
+  }
 }
 
 function IOSInstallBanner() {
@@ -81,6 +99,40 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
 
 const App = () => {
   const [splash, setSplash] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      setAuthChecked(true);
+      return;
+    }
+    checkToken(token).then(valid => {
+      setIsLoggedIn(valid);
+      if (!valid) localStorage.removeItem("auth_token");
+      setAuthChecked(true);
+    });
+  }, []);
+
+  function handleLogin(token: string) {
+    localStorage.setItem("auth_token", token);
+    setIsLoggedIn(true);
+  }
+
+  if (!authChecked) return null;
+
+  if (!isLoggedIn) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <LoginPage onLogin={handleLogin} />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

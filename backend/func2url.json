@@ -1,4 +1,5 @@
 {
+  "auth": "https://functions.poehali.dev/942caddf-e666-440d-9d89-682d8a35bae3",
   "sms": "https://functions.poehali.dev/42343668-6d19-4bfa-b2c0-709ccbd2788a",
   "cars-api": "https://functions.poehali.dev/569f47e9-9c87-4e78-aac2-72676d772a07",
   "documents": "https://functions.poehali.dev/96dd8cd4-b1a8-4573-ab07-b45126d11cad",

@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "Отправка кода — пустой телефон",
+      "method": "POST",
+      "path": "/",
+      "body": "{\"action\": \"send\", \"phone\": \"\"}",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "Укажите номер телефона"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Проверка кода — неверный",
+      "method": "POST",
+      "path": "/",
+      "body": "{\"action\": \"verify\", \"phone\": \"79001234567\", \"code\": \"000000\"}",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "Неверный или устаревший код"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Проверка токена — пустой",
+      "method": "POST",
+      "path": "/",
+      "body": "{\"action\": \"check\"}",
+      "expectedStatus": 401,
+      "expectedBody": {"ok": false},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
