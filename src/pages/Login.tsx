@@ -105,7 +105,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         setStep("code");
         startCountdown();
       } else {
-        setError(data.error || "Ошибка отправки SMS");
+        setError(data.hint || data.error || "Ошибка отправки SMS");
       }
     } catch {
       setError("Нет соединения, попробуйте ещё раз");

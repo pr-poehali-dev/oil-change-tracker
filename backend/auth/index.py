@@ -127,10 +127,19 @@ def handler(event: dict, context) -> dict:
             print(f"SMS exception: {e}")
 
         if not sms_ok:
+            sms_status_code = sms_result.get("status_code") if isinstance(sms_result, dict) else None
+            sms_phones = sms_result.get("sms") if isinstance(sms_result, dict) else None
+            print(f"SMS FAIL: status={sms_result.get('status')}, status_code={sms_status_code}, sms={sms_phones}, full={sms_result}")
+            # status_code 101 = нет денег, 102 = неверный api_id, 200 = ок
+            hint = ""
+            if sms_status_code == 101 or (sms_phones and any(v.get("status_code") == 101 for v in (sms_phones.values() if isinstance(sms_phones, dict) else []))):
+                hint = "Недостаточно средств на балансе SMS.ru"
+            elif SMS_API_KEY == "":
+                hint = "Не задан SMS_RU_API_KEY"
             return {
                 "statusCode": 500,
                 "headers": CORS,
-                "body": json.dumps({"error": "Не удалось отправить SMS", "detail": sms_result}, ensure_ascii=False),
+                "body": json.dumps({"error": "Не удалось отправить SMS", "detail": sms_result, "hint": hint}, ensure_ascii=False),
             }
 
         return {
