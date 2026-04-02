@@ -143,7 +143,10 @@ export default function ServiceCircles({
   const [resetDate, setResetDate] = useState("");
   const [resetKm, setResetKm] = useState("");
   const [page, setPage] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   function openReset(item: ServiceInterval) {
     setResetTarget(item);
@@ -174,9 +177,12 @@ export default function ServiceCircles({
     }
   }
 
-  function handleSwipe(dx: number) {
-    if (dx < -40 && page < totalPages - 1) setPage((p) => p + 1);
-    if (dx > 40 && page > 0) setPage((p) => p - 1);
+  function handleSwipeEnd(dx: number) {
+    const containerW = containerRef.current?.offsetWidth ?? 300;
+    if (dx < -containerW * 0.2 && page < totalPages - 1) setPage((p) => p + 1);
+    else if (dx > containerW * 0.2 && page > 0) setPage((p) => p - 1);
+    setDragOffset(0);
+    setDragging(false);
   }
 
   async function loadIntervals() {
@@ -267,31 +273,58 @@ export default function ServiceCircles({
           </button>
         </div>
 
-        {/* Circles */}
+        {/* Circles slider */}
         <div
-          className="touch-pan-y"
-          onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+          ref={containerRef}
+          className="overflow-hidden"
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0].clientX;
+            setDragging(true);
+          }}
+          onTouchMove={(e) => {
+            if (touchStartX.current === null) return;
+            const dx = e.touches[0].clientX - touchStartX.current;
+            // Ограничиваем: нельзя тянуть за края
+            if ((dx > 0 && page === 0) || (dx < 0 && page === totalPages - 1)) {
+              setDragOffset(dx * 0.2);
+            } else {
+              setDragOffset(dx);
+            }
+          }}
           onTouchEnd={(e) => {
             if (touchStartX.current !== null) {
-              handleSwipe(e.changedTouches[0].clientX - touchStartX.current);
+              handleSwipeEnd(e.changedTouches[0].clientX - touchStartX.current);
               touchStartX.current = null;
             }
           }}
         >
-          <div className="flex justify-around items-start py-2">
-            {pageItems.map((item) => (
-              <Circle
-                key={item.id}
-                item={item}
-                totalKm={totalKm}
-                oilInterval={oilInterval}
-                onReset={() => handleReset(item)}
-              />
-            ))}
-            {/* Заглушки если меньше 3 на странице */}
-            {pageItems.length < PER_PAGE && Array.from({ length: PER_PAGE - pageItems.length }).map((_, i) => (
-              <div key={`empty-${i}`} style={{ width: SIZE + 8 }} />
-            ))}
+          <div
+            className="flex"
+            style={{
+              transform: `translateX(calc(${-page * 100}% + ${dragOffset}px))`,
+              transition: dragging ? "none" : "transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+              willChange: "transform",
+            }}
+          >
+            {Array.from({ length: totalPages }).map((_, pageIdx) => {
+              const items = allItems.slice(pageIdx * PER_PAGE, pageIdx * PER_PAGE + PER_PAGE);
+              return (
+                <div key={pageIdx} className="flex justify-around items-start py-2 shrink-0 w-full">
+                  {items.map((item) => (
+                    <Circle
+                      key={item.id}
+                      item={item}
+                      totalKm={totalKm}
+                      oilInterval={oilInterval}
+                      onReset={() => handleReset(item)}
+                    />
+                  ))}
+                  {items.length < PER_PAGE && Array.from({ length: PER_PAGE - items.length }).map((_, i) => (
+                    <div key={`empty-${i}`} style={{ width: SIZE + 8 }} />
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </div>
 
