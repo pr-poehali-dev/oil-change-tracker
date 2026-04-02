@@ -4,9 +4,10 @@ import Icon from "@/components/ui/icon";
 
 import { scheduleOilNotifications, cancelOilNotifications, getScheduledRemaining } from "@/lib/notifications";
 import {
-  CarConfig, ManualGuide, Consumable,
+  CarConfig, ManualGuide, Consumable, ServiceInterval,
   DEFAULT_SPECS,
 } from "@/lib/cars";
+import ServiceCircles from "@/components/ServiceCircles";
 import {
   apiGetCars, apiCreateCar, apiDeleteCar, apiUpdateCar,
   apiGetEntries, apiSaveEntry, apiDeleteEntry,
@@ -248,6 +249,27 @@ export default function Index() {
 
   const [filtersRefreshing, setFiltersRefreshing] = useState(false);
   const [consumablesLoading, setConsumablesLoading] = useState(false);
+
+  async function handleIntervalsLoaded(intervals: ServiceInterval[]) {
+    if (!car) return;
+    setCustomCars((prev) =>
+      prev.map((c) => c.id === car.id ? { ...c, serviceIntervals: intervals } : c)
+    );
+    await apiUpdateCar(car.id, { serviceIntervals: intervals }).catch(() => {});
+  }
+
+  async function handleIntervalReset(intervalId: string) {
+    if (!car) return;
+    const today = getTodayStr();
+    const updated = (car.serviceIntervals ?? []).map((s) =>
+      s.id === intervalId ? { ...s, last_km: totalKm, last_date: today } : s
+    );
+    setCustomCars((prev) =>
+      prev.map((c) => c.id === car.id ? { ...c, serviceIntervals: updated } : c)
+    );
+    await apiUpdateCar(car.id, { serviceIntervals: updated }).catch(() => {});
+    showNotif("Замена зафиксирована!");
+  }
 
   async function handleRefreshFilters() {
     if (!car?.custom || filtersRefreshing) return;
@@ -522,6 +544,20 @@ export default function Index() {
                 </div>
               )}
             </div>
+
+            {car && (
+              <ServiceCircles
+                carId={car.id}
+                brand={car.brand}
+                model={car.model}
+                year={car.year}
+                engine={car.engine}
+                totalKm={totalKm}
+                intervals={car.serviceIntervals ?? []}
+                onIntervalsLoaded={handleIntervalsLoaded}
+                onIntervalReset={handleIntervalReset}
+              />
+            )}
 
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
               <div className="flex items-center justify-between">

@@ -78,6 +78,34 @@ def handler(event: dict, context) -> dict:
 
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': filters}, ensure_ascii=False)}
 
+    if mode == 'intervals':
+        if car_id and not force_refresh:
+            cached = _get_cached_intervals(car_id)
+            if cached:
+                print(f"Cache hit intervals: {car_id}")
+                return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'intervals': cached}, ensure_ascii=False)}
+
+        prompt = f"""Все жидкости и расходники {car}{eng} с интервалами замены. JSON без markdown:
+{{"intervals":[
+{{"id":"oil","name":"Масло","icon":"Droplets","color":"#e05a2b","interval_km":10000,"interval_months":12,"unit":"km"}},
+{{"id":"washer","name":"Омывайка","icon":"Droplets","color":"#3b82f6","interval_km":null,"interval_months":3,"unit":"months"}},
+{{"id":"air_filter","name":"Воздушный фильтр","icon":"Wind","color":"#10b981","interval_km":30000,"interval_months":null,"unit":"km"}},
+{{"id":"cabin_filter","name":"Салонный фильтр","icon":"Wind","color":"#8b5cf6","interval_km":15000,"interval_months":null,"unit":"km"}},
+{{"id":"brake_fluid","name":"Тормозная жидкость","icon":"AlertTriangle","color":"#f59e0b","interval_km":null,"interval_months":24,"unit":"months"}},
+{{"id":"coolant","name":"Антифриз","icon":"Thermometer","color":"#06b6d4","interval_km":null,"interval_months":60,"unit":"months"}},
+{{"id":"spark","name":"Свечи","icon":"Zap","color":"#f97316","interval_km":60000,"interval_months":null,"unit":"km"}}
+]}}
+Поля: id(уникальный), name(русское название), icon(lucide), color(hex), interval_km(число или null), interval_months(число или null), unit(km или months — основная единица).
+Верни 6-10 позиций актуальных для {car}. Реальные интервалы по регламенту."""
+
+        result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
+        intervals = result.get('intervals', [])
+
+        if car_id and intervals:
+            _save_cached_intervals(car_id, intervals)
+
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'intervals': intervals}, ensure_ascii=False)}
+
     if mode == 'consumables':
         if car_id and not force_refresh:
             cached = _get_cached_consumables(car_id)
@@ -178,6 +206,32 @@ def _save_cached_consumables(car_id: str, consumables: list):
         print(f"Cache save consumables error: {e}")
 
 
+def _get_cached_intervals(car_id: str) -> list:
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"SELECT service_intervals FROM {SCHEMA}.cars WHERE id = %s", (car_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception as e:
+        print(f"Cache read intervals error: {e}")
+    return []
+
+
+def _save_cached_intervals(car_id: str, intervals: list):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.cars SET service_intervals = %s WHERE id = %s",
+                    (json.dumps(intervals, ensure_ascii=False), car_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Cache save intervals error: {e}")
+
+
 def _get_cached_guides(car_id: str) -> dict:
     try:
         conn = get_conn()
@@ -273,4 +327,6 @@ def _fallback(prompt: str) -> dict:
         return {"filters": []}
     if '"consumables"' in prompt:
         return {"consumables": []}
+    if '"intervals"' in prompt:
+        return {"intervals": []}
     return {"specs": [], "oilInterval": 10000, "guides": []}

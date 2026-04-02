@@ -17,6 +17,18 @@ export type Consumable = {
   note: string;
 };
 
+export type ServiceInterval = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  interval_km: number | null;
+  interval_months: number | null;
+  unit: "km" | "months";
+  last_km?: number;       // пробег при последней замене
+  last_date?: string;     // дата последней замены ISO
+};
+
 export type CarConfig = {
   id: string;
   brand: string;
@@ -27,6 +39,7 @@ export type CarConfig = {
   guides: ManualGuide[];
   custom?: boolean;
   consumables?: Consumable[];
+  serviceIntervals?: ServiceInterval[];
 };
 export type CarSpecs = [string, string][];
 
