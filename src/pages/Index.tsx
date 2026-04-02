@@ -464,9 +464,9 @@ export default function Index() {
             <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
               <Icon name="RotateCcw" size={22} className="text-destructive" />
             </div>
-            <p className="font-golos font-bold text-foreground text-base mb-1">Сбросить счётчик?</p>
+            <p className="font-golos font-bold text-foreground text-base mb-1">Сбросить все данные?</p>
             <p className="text-sm text-muted-foreground font-golos leading-relaxed mb-5">
-              Весь накопленный пробег и история будут удалены. Это действие нельзя отменить.
+              Весь пробег, история и данные о заменах будут удалены. Это действие нельзя отменить.
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmReset(false)} className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors">Отмена</button>
@@ -549,7 +549,7 @@ export default function Index() {
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-destructive/30 bg-destructive/5 text-destructive text-sm font-golos font-semibold hover:bg-destructive/10 hover:border-destructive/50 active:scale-95 transition-all"
             >
               <Icon name="RotateCcw" size={15} className="text-destructive" />
-              Сбросить счётчик после замены масла
+              Сбросить все данные об автомобиле
             </button>
 
             {car?.custom && (
