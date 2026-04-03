@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
+import { AuthContext } from "@/lib/auth";
 
 
 function getTheme(): "light" | "dark" {
@@ -14,6 +15,7 @@ function applyTheme(theme: "light" | "dark") {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user, logout } = useContext(AuthContext);
   const [theme, setTheme] = useState<"light" | "dark">(getTheme);
 
   useEffect(() => {
@@ -80,6 +82,29 @@ export default function Settings() {
               <span className="text-sm text-muted-foreground">Создатель</span>
               <span className="text-sm font-medium text-foreground">vcomm</span>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
+                <Icon name="User" size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Профиль</p>
+                <p className="text-xs text-muted-foreground">{user?.phone || "—"}</p>
+              </div>
+            </div>
+          </div>
+          <div className="px-5 pb-4">
+            <button
+              onClick={logout}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-destructive/40 text-destructive text-sm font-golos font-medium hover:bg-destructive/5 active:scale-95 transition-all"
+            >
+              <Icon name="LogOut" size={15} />
+              Выйти из профиля
+            </button>
           </div>
         </div>
       </div>
