@@ -42,17 +42,17 @@ def handler(event: dict, context) -> dict:
     eng = f", двиг. {engine}" if engine else ""
 
     if mode == 'engines':
-        local = _find_local_engines(brand, model)
+        local = _find_local_engines(brand, model, generation)
         if local:
-            print(f"Local DB hit: {brand} {model} -> {len(local)} engines")
+            print(f"Local DB hit: {brand} {model} {generation} -> {len(local)} engines")
             return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': local}, ensure_ascii=False)}
 
         if not api_key:
             return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': []}, ensure_ascii=False)}
 
-        prompt = f'Список двигателей для {car}. Верни JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} До 12 вариантов. Включи код двигателя, объём, тип топлива (бензин/дизель/гибрид), мощность в л.с.'
+        prompt = f'Полный список всех двигателей для {car} — строго для этого поколения/кузова, не других. Верни JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} Все варианты комплектаций. Включи код двигателя, объём, тип топлива (бензин/дизель/гибрид), мощность в л.с. Не менее 3 и не более 15 вариантов.'
         print(f"Calling AI for engines: {car}")
-        result = _call_ai(api_key, prompt, max_tokens=600, use_openai=use_openai)
+        result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
         print(f"AI engines result: {str(result)[:200]}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
@@ -152,15 +152,39 @@ def handler(event: dict, context) -> dict:
     return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
 
-def _find_local_engines(brand: str, model: str) -> list:
+def _find_local_engines(brand: str, model: str, generation: str = '') -> list:
     b = brand.lower().strip()
     m = model.lower().strip()
+    g = generation.lower().strip()
     brand_data = ENGINES_DB.get(b)
-    if brand_data:
-        engines = brand_data.get(m)
-        if engines:
-            return engines
-    return []
+    if not brand_data:
+        return []
+    model_data = brand_data.get(m)
+    if not model_data:
+        return []
+    # Если есть поколения (dict внутри), ищем по поколению
+    if isinstance(model_data, dict):
+        if g:
+            # Точное совпадение
+            for key in model_data:
+                if key.lower() == g:
+                    return model_data[key]
+            # Частичное совпадение
+            for key in model_data:
+                if key.lower() in g or g in key.lower():
+                    return model_data[key]
+        # Нет поколения — возвращаем все уникальные двигатели
+        seen = set()
+        result = []
+        for engines in model_data.values():
+            for e in engines:
+                key = e['name']
+                if key not in seen:
+                    seen.add(key)
+                    result.append(e)
+        return result
+    # Список без поколений
+    return model_data
 
 
 def _get_cached_filters(car_id: str) -> list:
