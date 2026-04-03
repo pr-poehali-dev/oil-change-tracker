@@ -244,8 +244,8 @@ export default function ServiceCircles({
                   onIntervalReset(resetTarget.id, resetDate, km);
                   setResetTarget(null);
                 }}
-                className="w-full py-3 rounded-xl text-white text-sm font-golos font-semibold"
-                style={{ background: resetTarget.color }}
+                className="w-full py-3 rounded-xl text-sm font-golos font-semibold"
+                style={{ background: resetTarget.color, color: "#fff" }}
               >
                 Сохранить замену: {resetTarget.name}
               </button>

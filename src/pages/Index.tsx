@@ -263,6 +263,17 @@ export default function Index() {
 
   async function handleIntervalReset(intervalId: string, date: string, km: number) {
     if (!car) return;
+    // Масляный круг — сбрасываем счётчик пробега
+    if (intervalId === "__oil__") {
+      for (const e of entries) {
+        await apiDeleteEntry(car.id, e.date).catch(() => {});
+      }
+      setEntries([]);
+      setTotalKm(0);
+      await apiSaveReset(car.id, intervalId, date, km).catch(() => {});
+      showNotif("Замена масла зафиксирована! Счётчик сброшен.");
+      return;
+    }
     // Обновляем локальный стейт
     const updated = (car.serviceIntervals ?? []).map((s) =>
       s.id === intervalId ? { ...s, last_km: km, last_date: date } : s
