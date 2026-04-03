@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import LoginPage from "./pages/Login";
 import { AuthContext, AuthUser } from "./lib/auth";
+import { registerServiceWorker, requestWebNotifPermission } from "./lib/notifications";
 
 const AUTH_URL = "https://functions.poehali.dev/942caddf-e666-440d-9d89-682d8a35bae3";
 
@@ -104,6 +105,7 @@ const App = () => {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
+    registerServiceWorker();
     const token = localStorage.getItem("auth_token");
     const phone = localStorage.getItem("auth_phone") || "";
     if (!token) { setAuthChecked(true); return; }
@@ -113,6 +115,15 @@ const App = () => {
       setAuthChecked(true);
     });
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const asked = localStorage.getItem("web_notif_asked");
+    if (!asked) {
+      const t = setTimeout(() => requestWebNotifPermission(), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [user]);
 
   function handleLogin(token: string, phone: string) {
     localStorage.setItem("auth_token", token);

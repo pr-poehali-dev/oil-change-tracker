@@ -1,12 +1,9 @@
-// Локальные уведомления через Capacitor Local Notifications
-// Работают только в нативном приложении (Android/iOS) после установки пакета
-// В браузере — тихий режим без ошибок
-
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 const NOTIF_ID_BASE = 1000;
 const NOTIF_COUNT = 48;
 const STORAGE_KEY = "notif_scheduled_total";
+const WEB_NOTIF_PERMISSION_KEY = "web_notif_asked";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -16,6 +13,47 @@ function isNative(): boolean {
     return !!(window as any)?.Capacitor?.isNativePlatform?.();
   } catch {
     return false;
+  }
+}
+
+function isWebNotifSupported(): boolean {
+  return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
+}
+
+export async function requestWebNotifPermission(): Promise<boolean> {
+  if (!isWebNotifSupported()) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const result = await Notification.requestPermission();
+  localStorage.setItem(WEB_NOTIF_PERMISSION_KEY, '1');
+  return result === 'granted';
+}
+
+export function getWebNotifPermission(): NotificationPermission | null {
+  if (!isWebNotifSupported()) return null;
+  return Notification.permission;
+}
+
+export async function registerServiceWorker() {
+  if (!isWebNotifSupported()) return;
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+  } catch {
+    //
+  }
+}
+
+async function sendWebNotification(title: string, body: string, tag = 'autopilot') {
+  if (!isWebNotifSupported() || Notification.permission !== 'granted') return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) {
+      await reg.showNotification(title, { body, icon: '/favicon.svg', tag, renotify: true });
+    } else {
+      new Notification(title, { body, icon: '/favicon.svg', tag });
+    }
+  } catch {
+    try { new Notification(title, { body }); } catch { /* */ }
   }
 }
 
@@ -37,8 +75,20 @@ function getOverdueMessages(carName: string) {
 }
 
 export async function scheduleOilNotifications(remaining: number, carName: string) {
-  if (!isNative()) return;
+  // Web-браузер
+  if (!isNative()) {
+    if (!isWebNotifSupported() || Notification.permission !== 'granted') return;
+    if (remaining <= 0) {
+      const msgs = getOverdueMessages(carName);
+      await sendWebNotification(msgs[0].title, msgs[0].body, 'oil_overdue');
+    } else if (remaining <= 300) {
+      const msgs = getWarningMessages(remaining, carName);
+      await sendWebNotification(msgs[0].title, msgs[0].body, 'oil_warning');
+    }
+    return;
+  }
 
+  // Нативное приложение
   if (remaining > 300) {
     await cancelOilNotifications();
     return;
@@ -64,8 +114,6 @@ export async function scheduleOilNotifications(remaining: number, carName: strin
     const msgs = isOverdue ? getOverdueMessages(carName) : getWarningMessages(remaining, carName);
 
     const notifications = [];
-
-    // Первое уведомление — сразу (через 3 сек)
     notifications.push({
       id: NOTIF_ID_BASE,
       title: msgs[0].title,
@@ -75,7 +123,6 @@ export async function scheduleOilNotifications(remaining: number, carName: strin
       channelId: "oil_reminder",
     });
 
-    // Повторные уведомления
     let nextAt = Date.now();
     for (let i = 1; i < NOTIF_COUNT; i++) {
       nextAt += intervalMs;
