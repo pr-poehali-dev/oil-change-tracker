@@ -18,6 +18,7 @@ interface Props {
   model: string;
   year: string;
   engine?: string;
+  transmission?: "auto" | "manual";
   totalKm: number;
   oilInterval: number;
   intervals: ServiceInterval[];
@@ -134,7 +135,7 @@ function Circle({ item, totalKm, oilInterval, onReset }: {
 }
 
 export default function ServiceCircles({
-  carId, brand, model, year, engine,
+  carId, brand, model, year, engine, transmission,
   totalKm, oilInterval, intervals,
   onIntervalsLoaded, onIntervalReset,
 }: Props) {
@@ -188,7 +189,7 @@ export default function ServiceCircles({
       const res = await fetch(CAR_SPECS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand, model, year, carId, engine, mode: "intervals" }),
+        body: JSON.stringify({ brand, model, year, carId, engine, transmission, mode: "intervals" }),
       });
       const data = await res.json();
       if (data.intervals?.length) onIntervalsLoaded(data.intervals);
@@ -246,7 +247,7 @@ export default function ServiceCircles({
                 className="w-full py-3 rounded-xl text-white text-sm font-golos font-semibold"
                 style={{ background: resetTarget.color }}
               >
-                Сбросить данные: {resetTarget.name}
+                Сохранить замену: {resetTarget.name}
               </button>
               <button
                 onClick={() => setResetTarget(null)}

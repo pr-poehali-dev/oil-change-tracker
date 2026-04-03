@@ -35,6 +35,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
 
   const [year, setYear] = useState("");
   const [interval, setInterval] = useState("");
+  const [transmission, setTransmission] = useState<"auto" | "manual" | "">("");
 
   const [engines, setEngines] = useState<Engine[]>([]);
   const [selectedEngine, setSelectedEngine] = useState<Engine | null>(null);
@@ -134,6 +135,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setAiSpecs([]);
     setAiGuides([]);
     setInterval("");
+    setTransmission("");
     setFromDb(false);
     setDbCarId(null);
   }
@@ -238,6 +240,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       model: model.trim(),
       year: year.trim(),
       engine: selectedEngine?.name,
+      transmission: transmission || undefined,
       oilInterval: Number(interval),
       guides: aiGuides,
       custom: true,
@@ -361,6 +364,31 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
                 type="number" min="100"
                 className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-golos text-foreground placeholder:text-muted-foreground border border-transparent focus:outline-none focus:border-ring transition-colors"
               />
+            </div>
+          </div>
+
+          {/* КПП */}
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">КПП</label>
+            <div className="flex gap-2">
+              {(["auto", "manual"] as const).map((t) => {
+                const label = t === "auto" ? "Автомат" : "Механика";
+                const isSelected = transmission === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTransmission(isSelected ? "" : t)}
+                    className={`flex-1 py-2.5 rounded-xl border text-sm font-golos transition-all ${
+                      isSelected
+                        ? "border-ring bg-ring/10 text-foreground font-medium"
+                        : "border-border bg-secondary text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

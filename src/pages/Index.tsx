@@ -513,6 +513,7 @@ export default function Index() {
                 model={car.model}
                 year={car.year}
                 engine={car.engine}
+                transmission={car.transmission}
                 totalKm={totalKm}
                 oilInterval={OIL_INTERVAL}
                 intervals={car.serviceIntervals ?? []}
