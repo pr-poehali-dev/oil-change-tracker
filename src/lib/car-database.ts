@@ -187,6 +187,8 @@ export const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
       { name: "AE92", years: "1987–1991" },
       { name: "AE101", years: "1991–1995" },
       { name: "AE111", years: "1995–2000" },
+      { name: "E120", years: "2019–2021" },
+      { name: "E210 Рестайлинг", years: "2022–н.в." },
     ],
     "Sprinter Trueno": [
       { name: "AE71", years: "1979–1983" },
