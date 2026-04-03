@@ -181,6 +181,20 @@ export const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
       { name: "X90", years: "1996–2001" },
       { name: "X100", years: "1996–2001" },
     ],
+    "Levin": [
+      { name: "AE71", years: "1979–1983" },
+      { name: "AE86", years: "1983–1987" },
+      { name: "AE92", years: "1987–1991" },
+      { name: "AE101", years: "1991–1995" },
+      { name: "AE111", years: "1995–2000" },
+    ],
+    "Sprinter Trueno": [
+      { name: "AE71", years: "1979–1983" },
+      { name: "AE86", years: "1983–1987" },
+      { name: "AE92", years: "1987–1991" },
+      { name: "AE101", years: "1991–1995" },
+      { name: "AE111", years: "1995–2000" },
+    ],
     "Prius": [
       { name: "NHW10", years: "1997–2000" },
       { name: "NHW20", years: "2003–2009" },
