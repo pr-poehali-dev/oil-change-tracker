@@ -50,13 +50,24 @@ def handler(event: dict, context) -> dict:
         if not api_key:
             return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': []}, ensure_ascii=False)}
 
-        prompt = f"""Полный список ВСЕХ двигателей для {car}, год выпуска {year}.
-ВАЖНО: верни ТОЛЬКО двигатели, которые реально устанавливались на {brand} {model} поколения {generation if generation else '?'} в {year} году. Не путай с другими поколениями!
-Формат JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}}
-Включи: код двигателя, объём, тип топлива (бензин/дизель/гибрид), мощность в л.с.
-Перечисли ВСЕ варианты моторов для этого конкретного поколения (бензин, дизель, гибрид). От 3 до 15 вариантов."""
+        gen_hint = f" поколения {generation}" if generation else ""
+        prompt = f"""Какие двигатели устанавливались на {brand} {model}{gen_hint} {year} года выпуска?
+
+КРИТИЧЕСКИ ВАЖНО:
+- Указывай ТОЛЬКО реально существующие заводские коды двигателей Toyota/BMW/VW и т.д.
+- НЕ ВЫДУМЫВАЙ коды! Если не уверен в коде — укажи просто объём и мощность без кода.
+- Указывай двигатели СТРОГО для этого поколения и года, не путай с другими.
+- Лучше указать меньше двигателей, но правильных, чем много неправильных.
+
+Формат JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","volume":"2.0","fuel":"бензин","power":"171"}}]}}
+Поля: id, name (код двигателя + объём + тип топлива + мощность), volume, fuel (бензин/дизель/гибрид), power (л.с.)
+От 2 до 10 вариантов. Только JSON, без пояснений."""
         print(f"Calling AI for engines: {car} year={year}")
         result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
+        engines = result.get('engines', [])
+        engines = _validate_engines(engines)
+        if engines:
+            result['engines'] = engines
         print(f"AI engines result: {str(result)[:200]}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
@@ -164,6 +175,13 @@ GENERATION_YEARS = {
         "land cruiser": {"60 series": [1980,1990], "70 series": [1984,2026], "80 series": [1990,1998], "100 series": [1998,2007], "200 series": [2007,2021], "300 series": [2021,2026]},
         "land cruiser prado": {"j70": [1984,1996], "j90": [1996,2002], "j120": [2002,2009], "j150": [2009,2026]},
         "hilux": {"n50": [1978,1983], "n60": [1983,1988], "n80": [1988,1997], "n100": [1997,2005], "n120/n150": [2004,2015], "n210": [2015,2026]},
+        "levin": {"ae71": [1979,1983], "ae86": [1983,1987], "ae92": [1987,1991], "ae101": [1991,1995], "ae111": [1995,2000], "e120": [2019,2021], "e210 рестайлинг": [2022,2026]},
+        "prius": {"nhw10": [1997,2000], "nhw20": [2003,2009], "zvw30": [2009,2015], "zvw50": [2015,2022], "mxwh60": [2022,2026]},
+        "mark ii": {"x60": [1984,1988], "x70": [1988,1992], "x80": [1992,1996], "x90": [1996,2000], "x100": [1996,2000], "x110": [2000,2004]},
+        "chaser": {"x60": [1984,1988], "x70": [1988,1992], "x80": [1992,1996], "x90": [1996,2001], "x100": [1996,2001]},
+        "highlander": {"xu20": [2000,2007], "xu40": [2007,2013], "xu50": [2013,2019], "xu70": [2019,2026]},
+        "avensis": {"t220": [1997,2003], "t250": [2003,2008], "t270": [2008,2018]},
+        "yaris": {"xp10": [1999,2005], "xp90": [2005,2011], "xp130": [2011,2020], "xp210": [2020,2026]},
     },
     "volkswagen": {
         "golf": {"golf i": [1974,1983], "golf ii": [1983,1992], "golf iii": [1991,1998], "golf iv": [1997,2006], "golf v": [2003,2009], "golf vi": [2008,2013], "golf vii": [2012,2020], "golf viii": [2019,2026]},
@@ -283,6 +301,30 @@ def _find_local_engines(brand: str, model: str, generation: str = '', year: str 
         return result
 
     return model_data
+
+
+def _validate_engines(engines: list) -> list:
+    valid = []
+    seen = set()
+    for e in engines:
+        name = e.get('name', '').strip()
+        volume = e.get('volume', '').strip()
+        power = e.get('power', '').strip()
+        if not name or not volume or not power:
+            continue
+        try:
+            v = float(volume)
+            p = int(power)
+            if v < 0.5 or v > 8.0 or p < 30 or p > 800:
+                continue
+        except (ValueError, TypeError):
+            continue
+        key = f"{volume}_{power}"
+        if key in seen:
+            continue
+        seen.add(key)
+        valid.append(e)
+    return valid
 
 
 def _get_cached_filters(car_id: str) -> list:
