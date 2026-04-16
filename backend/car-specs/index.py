@@ -442,23 +442,34 @@ def _fetch_wiki_text(brand: str, model: str, generation: str = '') -> str:
 def _validate_engines(engines: list) -> list:
     valid = []
     seen = set()
+    if not isinstance(engines, list):
+        return []
     for e in engines:
-        name = e.get('name', '').strip()
-        volume = e.get('volume', '').strip()
-        power = e.get('power', '').strip()
-        if not name or not volume or not power:
+        if not isinstance(e, dict):
+            continue
+        name = str(e.get('name') or '').strip()
+        volume = str(e.get('volume') or '').strip()
+        power = str(e.get('power') or '').strip()
+        if not name:
             continue
         try:
-            v = float(volume)
-            p = int(power)
-            if v < 0.5 or v > 8.0 or p < 30 or p > 800:
-                continue
+            v = float(volume) if volume else 0
+            p = int(float(power)) if power else 0
         except (ValueError, TypeError):
+            v, p = 0, 0
+        if v and (v < 0.5 or v > 8.0):
             continue
-        key = f"{volume}_{power}"
+        if p and (p < 30 or p > 800):
+            continue
+        key = f"{name.lower()}"
         if key in seen:
             continue
         seen.add(key)
+        e['name'] = name
+        e['volume'] = volume
+        e['power'] = power
+        e['fuel'] = str(e.get('fuel') or 'бензин').strip()
+        e['id'] = str(e.get('id') or len(valid) + 1)
         valid.append(e)
     return valid
 
