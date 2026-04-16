@@ -42,16 +42,20 @@ def handler(event: dict, context) -> dict:
     eng = f", двиг. {engine}" if engine else ""
 
     if mode == 'engines':
-        local = _find_local_engines(brand, model, generation)
+        local = _find_local_engines(brand, model, generation, year)
         if local:
-            print(f"Local DB hit: {brand} {model} {generation} -> {len(local)} engines")
+            print(f"Local DB hit: {brand} {model} {generation} {year} -> {len(local)} engines")
             return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': local}, ensure_ascii=False)}
 
         if not api_key:
             return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': []}, ensure_ascii=False)}
 
-        prompt = f'Полный список всех двигателей для {car} — строго для этого поколения/кузова, не других. Верни JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}} Все варианты комплектаций. Включи код двигателя, объём, тип топлива (бензин/дизель/гибрид), мощность в л.с. Не менее 3 и не более 15 вариантов.'
-        print(f"Calling AI for engines: {car}")
+        prompt = f"""Полный список ВСЕХ двигателей для {car}, год выпуска {year}.
+ВАЖНО: верни ТОЛЬКО двигатели, которые реально устанавливались на {brand} {model} поколения {generation if generation else '?'} в {year} году. Не путай с другими поколениями!
+Формат JSON: {{"engines":[{{"id":"1","name":"1AZ-FE 2.0 бензин 150 л.с.","volume":"2.0","fuel":"бензин","power":"150"}}]}}
+Включи: код двигателя, объём, тип топлива (бензин/дизель/гибрид), мощность в л.с.
+Перечисли ВСЕ варианты моторов для этого конкретного поколения (бензин, дизель, гибрид). От 3 до 15 вариантов."""
+        print(f"Calling AI for engines: {car} year={year}")
         result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
         print(f"AI engines result: {str(result)[:200]}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
@@ -152,28 +156,122 @@ def handler(event: dict, context) -> dict:
     return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
 
-def _find_local_engines(brand: str, model: str, generation: str = '') -> list:
+GENERATION_YEARS = {
+    "toyota": {
+        "corolla": {"e80": [1983,1987], "e90": [1987,1992], "e100": [1991,1999], "e110": [1995,2002], "e120 / e130": [2001,2007], "e140 / e150": [2006,2013], "e160 / e170": [2012,2019], "e210": [2018,2026]},
+        "camry": {"v10": [1982,1986], "v20": [1986,1991], "v30": [1991,1996], "v40": [1994,2001], "xv30": [2001,2006], "xv40": [2006,2011], "xv50": [2011,2017], "xv70": [2017,2026]},
+        "rav4": {"xa10": [1994,2000], "xa20": [2000,2005], "xa30": [2005,2012], "xa40": [2012,2018], "xa50": [2018,2026]},
+        "land cruiser": {"60 series": [1980,1990], "70 series": [1984,2026], "80 series": [1990,1998], "100 series": [1998,2007], "200 series": [2007,2021], "300 series": [2021,2026]},
+        "land cruiser prado": {"j70": [1984,1996], "j90": [1996,2002], "j120": [2002,2009], "j150": [2009,2026]},
+        "hilux": {"n50": [1978,1983], "n60": [1983,1988], "n80": [1988,1997], "n100": [1997,2005], "n120/n150": [2004,2015], "n210": [2015,2026]},
+    },
+    "volkswagen": {
+        "golf": {"golf i": [1974,1983], "golf ii": [1983,1992], "golf iii": [1991,1998], "golf iv": [1997,2006], "golf v": [2003,2009], "golf vi": [2008,2013], "golf vii": [2012,2020], "golf viii": [2019,2026]},
+        "passat": {"b1": [1973,1980], "b2": [1980,1988], "b3": [1988,1993], "b4": [1993,1997], "b5": [1996,2005], "b6": [2005,2010], "b7": [2010,2015], "b8": [2014,2026]},
+        "polo": {"mk1": [1975,1981], "mk2": [1981,1994], "mk3": [1994,2002], "mk4": [2001,2009], "mk5": [2009,2017], "mk6": [2017,2026]},
+        "tiguan": {"mk1": [2007,2016], "mk2": [2016,2026]},
+        "touareg": {"7l": [2002,2010], "7p": [2010,2018], "cr": [2018,2026]},
+    },
+    "hyundai": {
+        "solaris": {"i поколение": [2010,2017], "ii поколение": [2017,2026]},
+        "creta": {"i поколение": [2015,2020], "ii поколение": [2020,2026]},
+        "tucson": {"jm": [2004,2009], "lm/ix35": [2009,2015], "tl": [2015,2020], "nx4": [2020,2026]},
+        "santa fe": {"sm": [2000,2006], "cm": [2006,2012], "dm": [2012,2018], "tm": [2018,2026]},
+        "elantra": {"xd": [2000,2006], "hd": [2006,2010], "md/ud": [2010,2015], "ad": [2015,2020], "cn7": [2020,2026]},
+        "sonata": {"ef": [1998,2004], "nf": [2004,2010], "yf": [2009,2014], "lf": [2014,2019], "dn8": [2019,2026]},
+    },
+    "kia": {
+        "rio": {"dc": [2000,2005], "jb": [2005,2011], "ub": [2011,2017], "fb": [2017,2026]},
+        "ceed": {"ed": [2006,2012], "jd": [2012,2018], "cd": [2018,2026]},
+        "sportage": {"i поколение": [1993,2004], "km": [2004,2010], "sl": [2010,2015], "ql": [2015,2021], "nq5": [2021,2026]},
+        "sorento": {"bl": [2002,2009], "xm": [2009,2014], "um": [2014,2020], "mq4": [2020,2026]},
+    },
+    "bmw": {
+        "3 series": {"e21": [1975,1983], "e30": [1982,1994], "e36": [1990,2000], "e46": [1997,2006], "e90/e91/e92/e93": [2004,2013], "f30/f31/f34": [2011,2019], "g20/g21": [2018,2026]},
+        "5 series": {"e12": [1972,1981], "e28": [1981,1988], "e34": [1988,1996], "e39": [1995,2004], "e60/e61": [2003,2010], "f10/f11": [2009,2017], "g30/g31": [2016,2026]},
+        "x3": {"e83": [2003,2010], "f25": [2010,2017], "g01": [2017,2026]},
+        "x5": {"e53": [1999,2006], "e70": [2006,2013], "f15": [2013,2018], "g05": [2018,2026]},
+    },
+    "mercedes-benz": {
+        "c-class": {"w201": [1982,1993], "w202": [1993,2000], "w203": [2000,2007], "w204": [2007,2014], "w205": [2014,2021], "w206": [2021,2026]},
+        "e-class": {"w123": [1976,1985], "w124": [1984,1997], "w210": [1995,2003], "w211": [2002,2009], "w212": [2009,2016], "w213": [2016,2026]},
+    },
+    "nissan": {
+        "qashqai": {"j10": [2006,2013], "j11": [2013,2021], "j12": [2021,2026]},
+        "x-trail": {"t30": [2000,2007], "t31": [2007,2013], "t32": [2013,2021], "t33": [2021,2026]},
+    },
+    "ford": {
+        "focus": {"i поколение": [1998,2005], "ii поколение": [2004,2011], "iii поколение": [2010,2018], "iv поколение": [2018,2026]},
+        "mondeo": {"i поколение": [1992,1996], "ii поколение": [1996,2000], "iii поколение": [2000,2007], "iv поколение": [2007,2014], "v поколение": [2014,2026]},
+    },
+    "mazda": {
+        "3": {"bk": [2003,2009], "bl": [2009,2013], "bm/bn": [2013,2019], "bp": [2019,2026]},
+        "6": {"gg/gy": [2002,2008], "gh": [2007,2012], "gj/gl": [2012,2026]},
+        "cx-5": {"ke": [2011,2017], "kf": [2017,2026]},
+    },
+    "honda": {
+        "civic": {"6th": [1995,2000], "7th": [2000,2005], "8th": [2005,2011], "9th": [2011,2015], "10th": [2015,2021], "11th": [2021,2026]},
+        "cr-v": {"rd1-rd3": [1995,2001], "rd4-rd7": [2001,2006], "re": [2006,2012], "rm": [2012,2018], "rw": [2016,2026]},
+        "accord": {"6th": [1997,2002], "7th": [2002,2008], "8th": [2007,2013], "9th": [2012,2017], "10th": [2017,2026]},
+    },
+    "renault": {
+        "logan": {"i поколение": [2004,2012], "ii поколение": [2012,2026]},
+        "duster": {"i поколение": [2010,2018], "ii поколение": [2018,2026]},
+    },
+    "skoda": {
+        "octavia": {"a4/1u": [1996,2004], "a5/1z": [2004,2013], "a7/5e": [2012,2020], "a8/nx": [2019,2026]},
+    },
+}
+
+
+def _find_gen_by_year(brand: str, model: str, year: int) -> str:
+    brand_gens = GENERATION_YEARS.get(brand)
+    if not brand_gens:
+        return ''
+    model_gens = brand_gens.get(model)
+    if not model_gens:
+        return ''
+    for gen_name, (y_start, y_end) in model_gens.items():
+        if y_start <= year <= y_end:
+            return gen_name
+    return ''
+
+
+def _find_local_engines(brand: str, model: str, generation: str = '', year: str = '') -> list:
     b = brand.lower().strip()
     m = model.lower().strip()
     g = generation.lower().strip()
+    y = 0
+    try:
+        y = int(year)
+    except (ValueError, TypeError):
+        pass
+
     brand_data = ENGINES_DB.get(b)
     if not brand_data:
         return []
     model_data = brand_data.get(m)
     if not model_data:
         return []
-    # Если есть поколения (dict внутри), ищем по поколению
+
     if isinstance(model_data, dict):
         if g:
-            # Точное совпадение
             for key in model_data:
                 if key.lower() == g:
                     return model_data[key]
-            # Частичное совпадение
             for key in model_data:
                 if key.lower() in g or g in key.lower():
                     return model_data[key]
-        # Нет поколения — возвращаем все уникальные двигатели
+
+        if y and not g:
+            found_gen = _find_gen_by_year(b, m, y)
+            if found_gen:
+                for key in model_data:
+                    if key.lower() == found_gen:
+                        return model_data[key]
+                    if key.lower() in found_gen or found_gen in key.lower():
+                        return model_data[key]
+
         seen = set()
         result = []
         for engines in model_data.values():
@@ -183,7 +281,7 @@ def _find_local_engines(brand: str, model: str, generation: str = '') -> list:
                     seen.add(key)
                     result.append(e)
         return result
-    # Список без поколений
+
     return model_data
 
 
