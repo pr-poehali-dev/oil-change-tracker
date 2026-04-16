@@ -1,6 +1,8 @@
 import json
 import os
+import re
 import urllib.request
+import urllib.parse
 import psycopg2  # noqa: F401 — required, installed via requirements.txt
 from engines_db import ENGINES_DB
 
@@ -50,20 +52,28 @@ def handler(event: dict, context) -> dict:
         if not api_key:
             return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': []}, ensure_ascii=False)}
 
+        wiki_text = _fetch_wiki_text(brand, model, generation)
+        print(f"Wiki text length: {len(wiki_text)}")
+
         gen_hint = f" поколения {generation}" if generation else ""
-        prompt = f"""Какие двигатели устанавливались на {brand} {model}{gen_hint} {year} года выпуска?
+        if wiki_text:
+            prompt = f"""Из текста статьи Wikipedia извлеки ВСЕ двигатели, которые устанавливались на {brand} {model}{gen_hint} {year} года выпуска.
 
-КРИТИЧЕСКИ ВАЖНО:
-- Указывай ТОЛЬКО реально существующие заводские коды двигателей Toyota/BMW/VW и т.д.
-- НЕ ВЫДУМЫВАЙ коды! Если не уверен в коде — укажи просто объём и мощность без кода.
-- Указывай двигатели СТРОГО для этого поколения и года, не путай с другими.
-- Лучше указать меньше двигателей, но правильных, чем много неправильных.
+ТЕКСТ СТАТЬИ:
+{wiki_text[:4000]}
 
+ЗАДАЧА: На основе ТОЛЬКО этого текста составь список двигателей. Используй ТОЛЬКО коды и данные из текста выше — НЕ ДОБАВЛЯЙ ничего от себя.
+Формат JSON: {{"engines":[{{"id":"1","name":"9NR-FTS 1.2 турбо бензин 116 л.с.","volume":"1.2","fuel":"бензин","power":"116"}}]}}
+Поля: id, name (код двигателя + объём + тип топлива + мощность в л.с.), volume, fuel (бензин/дизель/гибрид), power.
+Мощность указывай в л.с. (PS/hp → л.с., kW × 1.36 = л.с.). Только JSON."""
+        else:
+            prompt = f"""Какие двигатели устанавливались на {brand} {model}{gen_hint} {year} года выпуска?
+Указывай ТОЛЬКО реально существующие заводские коды. НЕ ВЫДУМЫВАЙ. Лучше меньше, но правильных.
 Формат JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","volume":"2.0","fuel":"бензин","power":"171"}}]}}
-Поля: id, name (код двигателя + объём + тип топлива + мощность), volume, fuel (бензин/дизель/гибрид), power (л.с.)
-От 2 до 10 вариантов. Только JSON, без пояснений."""
-        print(f"Calling AI for engines: {car} year={year}")
-        result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
+Поля: id, name, volume, fuel (бензин/дизель/гибрид), power (л.с.). От 2 до 10 вариантов. Только JSON."""
+
+        print(f"Calling AI for engines: {car} year={year} wiki={'yes' if wiki_text else 'no'}")
+        result = _call_ai(api_key, prompt, max_tokens=1500, use_openai=use_openai)
         engines = result.get('engines', [])
         engines = _validate_engines(engines)
         if engines:
@@ -301,6 +311,63 @@ def _find_local_engines(brand: str, model: str, generation: str = '', year: str 
         return result
 
     return model_data
+
+
+def _fetch_wiki_text(brand: str, model: str, generation: str = '') -> str:
+    titles_to_try = []
+    b = brand.strip()
+    m = model.strip()
+    g = generation.strip()
+
+    if g:
+        gen_clean = re.sub(r'[/\\]', '', g).strip()
+        gen_code = re.sub(r'\s*(поколение|рестайлинг|series)\s*', '', gen_clean, flags=re.IGNORECASE).strip()
+        titles_to_try.append(f"{b}_{m}_({gen_clean})")
+        titles_to_try.append(f"{b}_{m}_({gen_code})")
+        if re.match(r'^[A-Z0-9]+$', gen_code, re.IGNORECASE):
+            titles_to_try.append(f"{b}_{m}_{gen_code}")
+
+    titles_to_try.append(f"{b}_{m}")
+
+    for raw_title in titles_to_try:
+        title = raw_title.replace(' ', '_')
+        try:
+            api_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exlimit=1&titles={urllib.parse.quote(title)}&explaintext=1&format=json&exsectionformat=plain"
+            req = urllib.request.Request(api_url, headers={'User-Agent': 'CarSpecsBot/1.0'})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            pages = data.get('query', {}).get('pages', {})
+            for page_id, page in pages.items():
+                if page_id == '-1':
+                    continue
+                text = page.get('extract', '')
+                if text and len(text) > 200:
+                    print(f"Wiki found: {title} ({len(text)} chars)")
+                    return text
+        except Exception as e:
+            print(f"Wiki fetch failed for {title}: {e}")
+            continue
+
+    for raw_title in titles_to_try[:2]:
+        title = raw_title.replace(' ', '_')
+        try:
+            api_url = f"https://ru.wikipedia.org/w/api.php?action=query&prop=extracts&exlimit=1&titles={urllib.parse.quote(title)}&explaintext=1&format=json&exsectionformat=plain"
+            req = urllib.request.Request(api_url, headers={'User-Agent': 'CarSpecsBot/1.0'})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            pages = data.get('query', {}).get('pages', {})
+            for page_id, page in pages.items():
+                if page_id == '-1':
+                    continue
+                text = page.get('extract', '')
+                if text and len(text) > 200:
+                    print(f"Wiki RU found: {title} ({len(text)} chars)")
+                    return text
+        except Exception as e:
+            print(f"Wiki RU fetch failed for {title}: {e}")
+            continue
+
+    return ''
 
 
 def _validate_engines(engines: list) -> list:
