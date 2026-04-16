@@ -57,20 +57,18 @@ def handler(event: dict, context) -> dict:
 
         gen_hint = f" поколения {generation}" if generation else ""
         if wiki_text:
-            prompt = f"""Из текста статьи Wikipedia извлеки ВСЕ двигатели, которые устанавливались на {brand} {model}{gen_hint} {year} года выпуска.
+            prompt = f"""Из текста Wikipedia извлеки все двигатели для {brand} {model}{gen_hint} {year} г.
 
-ТЕКСТ СТАТЬИ:
-{wiki_text[:4000]}
+ТЕКСТ:
+{wiki_text[:5500]}
 
-ЗАДАЧА: На основе ТОЛЬКО этого текста составь список двигателей. Используй ТОЛЬКО коды и данные из текста выше — НЕ ДОБАВЛЯЙ ничего от себя.
-Формат JSON: {{"engines":[{{"id":"1","name":"9NR-FTS 1.2 турбо бензин 116 л.с.","volume":"1.2","fuel":"бензин","power":"116"}}]}}
-Поля: id, name (код двигателя + объём + тип топлива + мощность в л.с.), volume, fuel (бензин/дизель/гибрид), power.
-Мощность указывай в л.с. (PS/hp → л.с., kW × 1.36 = л.с.). Только JSON."""
+Извлеки из текста выше ВСЕ двигатели (engine codes). Конвертируй kW в л.с. (×1.36), hp/PS = л.с.
+НЕ ДОБАВЛЯЙ двигатели которых нет в тексте!
+JSON: {{"engines":[{{"id":"1","name":"1ZZ-FE 1.8 бензин 143 л.с.","volume":"1.8","fuel":"бензин","power":"143"}}]}}"""
         else:
-            prompt = f"""Какие двигатели устанавливались на {brand} {model}{gen_hint} {year} года выпуска?
-Указывай ТОЛЬКО реально существующие заводские коды. НЕ ВЫДУМЫВАЙ. Лучше меньше, но правильных.
-Формат JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","volume":"2.0","fuel":"бензин","power":"171"}}]}}
-Поля: id, name, volume, fuel (бензин/дизель/гибрид), power (л.с.). От 2 до 10 вариантов. Только JSON."""
+            prompt = f"""Двигатели {brand} {model}{gen_hint} {year} года. ТОЛЬКО реальные заводские коды. НЕ ВЫДУМЫВАЙ.
+JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","volume":"2.0","fuel":"бензин","power":"171"}}]}}
+Поля: id, name, volume, fuel (бензин/дизель/гибрид), power (л.с.). 2-10 вариантов."""
 
         print(f"Calling AI for engines: {car} year={year} wiki={'yes' if wiki_text else 'no'}")
         result = _call_ai(api_key, prompt, max_tokens=1500, use_openai=use_openai)
@@ -313,59 +311,130 @@ def _find_local_engines(brand: str, model: str, generation: str = '', year: str 
     return model_data
 
 
+def _wiki_api(lang: str, params: dict) -> dict:
+    base = f"https://{lang}.wikipedia.org/w/api.php"
+    params['format'] = 'json'
+    qs = urllib.parse.urlencode(params)
+    req = urllib.request.Request(f"{base}?{qs}", headers={'User-Agent': 'CarSpecsBot/1.0'})
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        return json.loads(resp.read().decode('utf-8'))
+
+
+def _wiki_get_sections(lang: str, title: str) -> list:
+    data = _wiki_api(lang, {'action': 'parse', 'page': title, 'prop': 'sections'})
+    return data.get('parse', {}).get('sections', [])
+
+
+def _wiki_get_section_text(lang: str, title: str, section_idx: int) -> str:
+    data = _wiki_api(lang, {'action': 'query', 'prop': 'extracts', 'titles': title,
+                             'exlimit': '1', 'explaintext': '1', 'exsectionformat': 'plain',
+                             'exchars': '8000', 'exintro': '' if section_idx == 0 else None})
+    if section_idx > 0:
+        data = _wiki_api(lang, {'action': 'parse', 'page': title, 'prop': 'wikitext',
+                                  'section': str(section_idx)})
+        wt = data.get('parse', {}).get('wikitext', {}).get('*', '')
+        clean = re.sub(r'\[\[(?:[^|\]]*\|)?([^\]]*)\]\]', r'\1', wt)
+        clean = re.sub(r'\{\{[^}]*\}\}', '', clean)
+        clean = re.sub(r'<[^>]+>', '', clean)
+        clean = re.sub(r"'{2,}", '', clean)
+        return clean.strip()
+    pages = data.get('query', {}).get('pages', {})
+    for p in pages.values():
+        return p.get('extract', '')
+    return ''
+
+
+ENGINE_SECTION_KEYWORDS = [
+    'engine', 'powertrain', 'drivetrain', 'motor', 'specification',
+    'двигател', 'силов', 'характеристик', 'модификац',
+    'performance', 'technical', 'generation', 'variant', 'model',
+]
+
+
+def _extract_engine_sections(lang: str, title: str, generation: str = '') -> str:
+    try:
+        sections = _wiki_get_sections(lang, title)
+    except Exception as e:
+        print(f"Wiki sections failed {title}: {e}")
+        return ''
+
+    relevant = []
+    gen_lower = generation.lower().strip() if generation else ''
+
+    for s in sections:
+        line_lower = s.get('line', '').lower()
+        level = int(s.get('level', 2))
+        idx = int(s.get('index', 0))
+
+        is_engine = any(kw in line_lower for kw in ENGINE_SECTION_KEYWORDS)
+        is_gen = gen_lower and (gen_lower in line_lower or any(p in line_lower for p in gen_lower.replace('/', ' ').split()))
+
+        if is_engine or is_gen:
+            relevant.append((idx, s.get('line', ''), level))
+
+    if not relevant:
+        for s in sections:
+            level = int(s.get('level', 2))
+            if level <= 2:
+                relevant.append((int(s.get('index', 0)), s.get('line', ''), level))
+        relevant = relevant[:5]
+
+    result_parts = []
+    total_len = 0
+    for idx, name, level in relevant[:8]:
+        try:
+            text = _wiki_get_section_text(lang, title, idx)
+            if text and len(text) > 30:
+                part = f"=== {name} ===\n{text}"
+                result_parts.append(part)
+                total_len += len(part)
+                if total_len > 6000:
+                    break
+        except Exception as e:
+            print(f"Wiki section {idx} failed: {e}")
+
+    return '\n\n'.join(result_parts)
+
+
 def _fetch_wiki_text(brand: str, model: str, generation: str = '') -> str:
-    titles_to_try = []
     b = brand.strip()
     m = model.strip()
     g = generation.strip()
 
+    titles_to_try = []
     if g:
         gen_clean = re.sub(r'[/\\]', '', g).strip()
         gen_code = re.sub(r'\s*(поколение|рестайлинг|series)\s*', '', gen_clean, flags=re.IGNORECASE).strip()
-        titles_to_try.append(f"{b}_{m}_({gen_clean})")
-        titles_to_try.append(f"{b}_{m}_({gen_code})")
-        if re.match(r'^[A-Z0-9]+$', gen_code, re.IGNORECASE):
-            titles_to_try.append(f"{b}_{m}_{gen_code}")
+        titles_to_try.append(f"{b} {m} ({gen_clean})")
+        titles_to_try.append(f"{b} {m} ({gen_code})")
+    titles_to_try.append(f"{b} {m}")
 
-    titles_to_try.append(f"{b}_{m}")
-
-    for raw_title in titles_to_try:
-        title = raw_title.replace(' ', '_')
-        try:
-            api_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exlimit=1&titles={urllib.parse.quote(title)}&explaintext=1&format=json&exsectionformat=plain"
-            req = urllib.request.Request(api_url, headers={'User-Agent': 'CarSpecsBot/1.0'})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-            pages = data.get('query', {}).get('pages', {})
-            for page_id, page in pages.items():
-                if page_id == '-1':
-                    continue
-                text = page.get('extract', '')
-                if text and len(text) > 200:
-                    print(f"Wiki found: {title} ({len(text)} chars)")
+    for lang in ['en', 'ru']:
+        for title in titles_to_try:
+            try:
+                text = _extract_engine_sections(lang, title, g)
+                if text and len(text) > 100:
+                    print(f"Wiki {lang} sections found: {title} ({len(text)} chars)")
                     return text
-        except Exception as e:
-            print(f"Wiki fetch failed for {title}: {e}")
-            continue
+            except Exception as e:
+                print(f"Wiki {lang} failed {title}: {e}")
+                continue
 
-    for raw_title in titles_to_try[:2]:
-        title = raw_title.replace(' ', '_')
-        try:
-            api_url = f"https://ru.wikipedia.org/w/api.php?action=query&prop=extracts&exlimit=1&titles={urllib.parse.quote(title)}&explaintext=1&format=json&exsectionformat=plain"
-            req = urllib.request.Request(api_url, headers={'User-Agent': 'CarSpecsBot/1.0'})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-            pages = data.get('query', {}).get('pages', {})
-            for page_id, page in pages.items():
-                if page_id == '-1':
-                    continue
-                text = page.get('extract', '')
-                if text and len(text) > 200:
-                    print(f"Wiki RU found: {title} ({len(text)} chars)")
-                    return text
-        except Exception as e:
-            print(f"Wiki RU fetch failed for {title}: {e}")
-            continue
+    for lang in ['en', 'ru']:
+        for title in titles_to_try:
+            try:
+                data = _wiki_api(lang, {'action': 'query', 'prop': 'extracts', 'titles': title,
+                                         'exlimit': '1', 'explaintext': '1', 'exchars': '6000'})
+                pages = data.get('query', {}).get('pages', {})
+                for pid, page in pages.items():
+                    if pid == '-1':
+                        continue
+                    text = page.get('extract', '')
+                    if text and len(text) > 200:
+                        print(f"Wiki {lang} full fallback: {title} ({len(text)} chars)")
+                        return text
+            except Exception:
+                continue
 
     return ''
 
@@ -507,12 +576,13 @@ def _save_cached_guides(car_id: str, result: dict):
 def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool = False) -> dict:
     folder_id = os.environ.get('YANDEX_FOLDER_ID', '')
     url = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
+    actual_max = max(max_tokens, 2000)
     payload = json.dumps({
         'modelUri': f'gpt://{folder_id}/yandexgpt',
         'completionOptions': {
             'stream': False,
             'temperature': 0.1,
-            'maxTokens': 2000,
+            'maxTokens': actual_max,
         },
         'messages': [
             {'role': 'system', 'text': 'Отвечай только валидным JSON без markdown, без пояснений, без блоков ```json.'},
