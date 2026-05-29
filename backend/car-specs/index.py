@@ -42,6 +42,7 @@ def handler(event: dict, context) -> dict:
     car = f"{brand} {model} {year}" + (f" ({generation})" if generation else "")
     engine = body.get('engine', '').strip()
     eng = f", двиг. {engine}" if engine else ""
+    transmission = body.get('transmission', '').strip().lower()
 
     if mode == 'engines':
         local = _find_local_engines(brand, model, generation, year)
@@ -101,14 +102,36 @@ JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","vol
 
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'filters': filters}, ensure_ascii=False)}
 
+    def _fix_transmission(items):
+        """Гарантируем что не показываются оба круга КПП сразу."""
+        if transmission == 'auto':
+            return [i for i in items if i.get('id') != 'gear_oil']
+        if transmission == 'manual':
+            return [i for i in items if i.get('id') != 'atf']
+        ids = {i.get('id') for i in items}
+        if 'atf' in ids and 'gear_oil' in ids:
+            return [i for i in items if i.get('id') != 'gear_oil']
+        return items
+
     if mode == 'intervals':
         if car_id and not force_refresh:
             cached = _get_cached_intervals(car_id)
             if cached:
                 print(f"Cache hit intervals: {car_id}")
+                cached = _fix_transmission(cached)
                 return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'intervals': cached}, ensure_ascii=False)}
 
-        prompt = f"""Полный регламент ТО для {car}{eng} — все жидкости и фильтры с реальными интервалами замены по заводскому регламенту. JSON без markdown:
+        if transmission == 'auto':
+            trans_hint = " с АКПП (автоматическая коробка)"
+            trans_rule = '- Коробка АКПП (автомат): включи "Масло АКПП" (id "atf"). ЗАПРЕЩЕНО включать "Масло КПП" (id "gear_oil") — это позиция только для механики!'
+        elif transmission == 'manual':
+            trans_hint = " с МКПП (механическая коробка)"
+            trans_rule = '- Коробка МКПП (механика): включи "Масло КПП" (id "gear_oil"). ЗАПРЕЩЕНО включать "Масло АКПП" (id "atf") — это позиция только для автомата!'
+        else:
+            trans_hint = ""
+            trans_rule = '- Коробка не указана: включи ТОЛЬКО ОДНУ позицию масла КПП — либо "Масло АКПП" (atf), либо "Масло КПП" (gear_oil), в зависимости от того что чаще ставят на эту модель. НЕ включай обе одновременно!'
+
+        prompt = f"""Полный регламент ТО для {car}{eng}{trans_hint} — все жидкости и фильтры с реальными интервалами замены по заводскому регламенту. JSON без markdown:
 {{"intervals":[
 {{"id":"oil","name":"Масло мотор","icon":"Droplets","color":"#e05a2b","interval_km":10000,"interval_months":12,"unit":"km"}},
 {{"id":"atf","name":"Масло АКПП","icon":"Settings","color":"#f97316","interval_km":60000,"interval_months":null,"unit":"km"}},
@@ -125,13 +148,17 @@ JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","vol
 {{"id":"washer","name":"Омывайка","icon":"Droplets","color":"#3b82f6","interval_km":null,"interval_months":3,"unit":"months"}}
 ]}}
 Правила:
-- Включай ТОЛЬКО позиции актуальные для {car} (например масло АКПП — только если есть АКПП, ГУР — только если есть ГУР, раздатка/диффы — только если полный привод)
+- Включай ТОЛЬКО позиции актуальные для {car} (ГУР — только если есть ГУР, раздатка/диффы — только если полный привод)
+{trans_rule}
 - Реальные интервалы строго по заводскому регламенту
 - Поля: id(уникальный), name(короткое русское до 14 символов), icon(lucide-react), color(hex), interval_km(число или null), interval_months(число или null), unit(km или months)
 - Верни 8-14 позиций"""
 
         result = _call_ai(api_key, prompt, max_tokens=1200, use_openai=use_openai)
         intervals = result.get('intervals', [])
+
+        # Подстраховка: не допускаем оба круга КПП одновременно
+        intervals = _fix_transmission(intervals)
 
         if car_id and intervals:
             _save_cached_intervals(car_id, intervals)
