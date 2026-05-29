@@ -65,7 +65,6 @@ export default function Index() {
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [notification, setNotification] = useState<string | null>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
 
   const [activeGuide, setActiveGuide] = useState<string | null>(null);
   const [openStep, setOpenStep] = useState<number | null>(null);
@@ -178,17 +177,6 @@ export default function Index() {
     } else if (newTotal >= OIL_INTERVAL * 0.8) {
       showNotif(`Осталось ${Math.round(OIL_INTERVAL - newTotal)} км до замены`);
     }
-  }
-
-  async function handleReset() {
-    if (!car) return;
-    for (const e of entries) {
-      await apiDeleteEntry(car.id, e.date).catch(() => {});
-    }
-    setEntries([]);
-    setTotalKm(0);
-    setConfirmReset(false);
-    showNotif("Счётчик сброшен. Новый отсчёт!");
   }
 
   async function handleAddCar(newCar: CarConfig, specs?: [string, string][]) {
@@ -437,11 +425,20 @@ export default function Index() {
             ))}
             <button
               onClick={() => { setCarDropdownOpen(false); setShowAddCar(true); }}
-              className="w-full px-4 py-3.5 flex items-center gap-2.5 hover:bg-secondary transition-colors text-left"
+              className="w-full px-4 py-3.5 flex items-center gap-2.5 hover:bg-secondary transition-colors text-left border-b border-border/50"
             >
               <Icon name="Plus" size={14} className="text-muted-foreground" />
               <span className="font-golos text-sm text-muted-foreground">Добавить автомобиль</span>
             </button>
+            {car && (
+              <button
+                onClick={() => { setCarDropdownOpen(false); setConfirmDeleteCar(true); }}
+                className="w-full px-4 py-3.5 flex items-center gap-2.5 hover:bg-destructive/5 transition-colors text-left"
+              >
+                <Icon name="Trash2" size={14} className="text-destructive" />
+                <span className="font-golos text-sm text-destructive">Удалить «{car.brand} {car.model}»</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -469,25 +466,6 @@ export default function Index() {
       </div>
 
 
-
-      {/* Confirm reset dialog */}
-      {confirmReset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
-          <div className="bg-card rounded-3xl border border-border p-6 w-full max-w-sm shadow-xl">
-            <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
-              <Icon name="RotateCcw" size={22} className="text-destructive" />
-            </div>
-            <p className="font-golos font-bold text-foreground text-base mb-1">Сбросить все данные?</p>
-            <p className="text-sm text-muted-foreground font-golos leading-relaxed mb-5">
-              Весь пробег, история и данные о заменах будут удалены. Это действие нельзя отменить.
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => setConfirmReset(false)} className="flex-1 py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium hover:bg-muted transition-colors">Отмена</button>
-              <button onClick={handleReset} className="flex-1 py-3 rounded-xl bg-destructive text-white text-sm font-golos font-semibold hover:opacity-85 active:scale-95 transition-all">Сбросить</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Confirm delete car */}
       {confirmDeleteCar && (
@@ -557,25 +535,6 @@ export default function Index() {
                 <button onClick={handleAddKm} className="shrink-0 bg-foreground text-background rounded-xl px-4 py-3 text-sm font-golos font-semibold hover:opacity-80 active:scale-95 transition-all">Добавить</button>
               </div>
             </div>
-
-            <button
-              onClick={() => setConfirmDeleteCar(true)}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-destructive/30 bg-destructive/5 text-destructive text-sm font-golos font-semibold hover:bg-destructive/10 hover:border-destructive/50 active:scale-95 transition-all"
-            >
-              <Icon name="Trash2" size={15} className="text-destructive" />
-              Сбросить все данные об автомобиле
-            </button>
-
-            {car?.custom && (
-              <button
-                onClick={() => setConfirmDeleteCar(true)}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-border text-muted-foreground text-sm font-golos hover:text-destructive hover:border-destructive/30 active:scale-95 transition-all"
-              >
-                <Icon name="Trash2" size={15} />
-                Удалить этот автомобиль
-              </button>
-            )}
-
 
           </div>
         )}
