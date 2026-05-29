@@ -250,6 +250,16 @@ export default function ServiceCircles({
                 Сохранить замену: {resetTarget.name}
               </button>
               <button
+                onClick={() => {
+                  onIntervalReset(resetTarget.id, new Date().toISOString().split("T")[0], totalKm);
+                  setResetTarget(null);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-destructive/30 bg-destructive/5 text-destructive text-sm font-golos font-semibold hover:bg-destructive/10 transition-colors"
+              >
+                <Icon name="RotateCcw" size={15} className="text-destructive" />
+                Сбросить круг
+              </button>
+              <button
                 onClick={() => setResetTarget(null)}
                 className="w-full py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium"
               >
