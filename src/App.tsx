@@ -128,6 +128,15 @@ const App = () => {
   function handleLogin(token: string, phone: string) {
     localStorage.setItem("auth_token", token);
     localStorage.setItem("auth_phone", phone);
+    // Переносим данные со старого анонимного uid на аккаунт (один раз)
+    const oldUid = localStorage.getItem("user_uid");
+    if (oldUid && !localStorage.getItem("migrated_" + phone)) {
+      import("./api").then(({ apiMigrateUser }) => {
+        apiMigrateUser(oldUid).catch(() => {}).finally(() => {
+          localStorage.setItem("migrated_" + phone, "1");
+        });
+      });
+    }
     setUser({ token, phone });
   }
 

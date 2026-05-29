@@ -6,6 +6,11 @@ const URLS = {
 };
 
 function getUserId(): string {
+  // Главный идентификатор — телефон/яндекс-аккаунт авторизованного пользователя.
+  // Данные привязаны к нему, поэтому доступны на любом устройстве после входа.
+  const phone = localStorage.getItem("auth_phone");
+  if (phone) return phone;
+  // Фолбэк для неавторизованных (на всякий случай)
   let uid = localStorage.getItem("user_uid");
   if (!uid) {
     uid = crypto.randomUUID();
@@ -64,6 +69,7 @@ export const apiSaveEntry = (carId: string, date: string, km: number) => carsPos
 export const apiDeleteEntry = (carId: string, date: string) => carsPost({ action: "delete_entry", carId, date });
 export const apiSaveReset = (carId: string, intervalId: string, lastDate: string, lastKm: number | null) =>
   carsPost({ action: "save_reset", carId, intervalId, lastDate, lastKm });
+export const apiMigrateUser = (oldUserId: string) => carsPost({ action: "migrate_user", oldUserId });
 
 // Documents
 export const apiGetDocuments = (params?: { type?: string }) => {

@@ -206,6 +206,25 @@ def handler(event: dict, context) -> dict:
             conn.close()
             return resp(200, {'ok': True})
 
+        if action == 'migrate_user':
+            # Перенос данных со старого случайного uid на телефон/аккаунт.
+            old_id = (body.get('oldUserId') or '').strip()
+            if not old_id or old_id == user_id:
+                return resp(200, {'ok': True, 'migrated': 0})
+            conn = get_conn()
+            cur = conn.cursor()
+            # Переносим только если у текущего пользователя ещё нет машин
+            cur.execute("SELECT COUNT(*) FROM cars WHERE user_id = %s", (user_id,))
+            has_cars = cur.fetchone()[0]
+            migrated = 0
+            if has_cars == 0:
+                cur.execute("UPDATE cars SET user_id = %s WHERE user_id = %s", (user_id, old_id))
+                migrated = cur.rowcount
+                cur.execute("UPDATE service_resets SET user_id = %s WHERE user_id = %s", (user_id, old_id))
+            conn.commit()
+            conn.close()
+            return resp(200, {'ok': True, 'migrated': migrated})
+
         if action == 'search_car':
             brand = body.get('brand', '').strip().lower()
             model = body.get('model', '').strip().lower()
