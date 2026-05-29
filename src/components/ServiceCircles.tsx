@@ -22,9 +22,13 @@ interface Props {
   totalKm: number;
   oilInterval: number;
   intervals: ServiceInterval[];
+  oilHidden?: boolean;
   onIntervalsLoaded: (intervals: ServiceInterval[]) => void;
   onIntervalsChange: (intervals: ServiceInterval[]) => void;
   onIntervalReset: (id: string, date: string, km: number) => void;
+  onOilIntervalChange: (km: number) => void;
+  onOilDelete: () => void;
+  onOilRestore: () => void;
 }
 
 const ICON_CHOICES = [
@@ -110,15 +114,13 @@ function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelet
     subLabel = getLastLabel(item);
   }
 
-  const canDelete = editMode && !isOil;
-
   return (
     <button
-      onClick={editMode ? (isOil ? undefined : onEdit) : onReset}
+      onClick={editMode ? onEdit : onReset}
       className="relative flex flex-col items-center gap-2 flex-1 min-w-0 active:scale-95 transition-transform"
       style={{ maxWidth: SIZE + 16 }}
     >
-      {canDelete && (
+      {editMode && (
         <span
           onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
           className="absolute -top-1 right-1 z-10 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center shadow-md"
@@ -126,7 +128,7 @@ function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelet
           <Icon name="X" size={14} />
         </span>
       )}
-      {editMode && !isOil && (
+      {editMode && (
         <span className="absolute top-7 left-1/2 -translate-x-1/2 z-10 w-6 h-6 rounded-full bg-foreground/80 text-background flex items-center justify-center pointer-events-none">
           <Icon name="Pencil" size={12} />
         </span>
@@ -173,8 +175,9 @@ function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelet
 
 export default function ServiceCircles({
   carId, brand, model, year, engine, transmission,
-  totalKm, oilInterval, intervals,
+  totalKm, oilInterval, intervals, oilHidden,
   onIntervalsLoaded, onIntervalsChange, onIntervalReset,
+  onOilIntervalChange, onOilDelete, onOilRestore,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [resetTarget, setResetTarget] = useState<ServiceInterval | null>(null);
@@ -227,6 +230,12 @@ export default function ServiceCircles({
     if (!editDraft || !editDraft.name.trim()) return;
     const km = editDraft.unit === "km" ? parseInt(editDraft.interval_km) || null : null;
     const months = editDraft.unit === "months" ? parseInt(editDraft.interval_months) || null : null;
+    // Масляный круг — интервал хранится в car.oilInterval
+    if (editDraft.id === "__oil__") {
+      onOilIntervalChange(km || 0);
+      setEditDraft(null);
+      return;
+    }
     const built: ServiceInterval = {
       id: editDraft.id,
       name: editDraft.name.trim(),
@@ -246,6 +255,7 @@ export default function ServiceCircles({
   }
 
   function deleteInterval(id: string) {
+    if (id === "__oil__") { onOilDelete(); return; }
     onIntervalsChange(cleanIntervals().filter((i) => i.id !== id));
   }
 
@@ -260,7 +270,8 @@ export default function ServiceCircles({
     unit: "km",
   };
 
-  const baseItems: ServiceInterval[] = [oilItem, ...intervals.filter((i) => i.id !== "__oil__" && i.id !== "oil")];
+  const otherItems = intervals.filter((i) => i.id !== "__oil__" && i.id !== "oil");
+  const baseItems: ServiceInterval[] = oilHidden ? otherItems : [oilItem, ...otherItems];
   const ADD_TILE: ServiceInterval = { id: "__add__", name: "", icon: "Plus", color: "#888", interval_km: null, interval_months: null, unit: "km" };
   const allItems: ServiceInterval[] = editMode ? [...baseItems, ADD_TILE] : baseItems;
   const totalPages = Math.max(1, Math.ceil(allItems.length / PER_PAGE));
@@ -483,6 +494,16 @@ export default function ServiceCircles({
               />
             ))}
           </div>
+        )}
+
+        {editMode && oilHidden && (
+          <button
+            onClick={onOilRestore}
+            className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border bg-secondary text-foreground text-xs font-golos font-medium"
+          >
+            <Icon name="RotateCcw" size={13} />
+            Вернуть круг «Масло»
+          </button>
         )}
 
         <p className="text-xs text-muted-foreground font-golos mt-3 text-center">

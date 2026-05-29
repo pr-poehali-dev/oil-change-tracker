@@ -45,7 +45,7 @@ def handler(event: dict, context) -> dict:
         cur = conn.cursor()
         cur.execute("""
             SELECT c.id, c.brand, c.model, c.year, c.oil_interval, c.guides, c.custom,
-                   cs.specs, c.filters, c.consumables, c.service_intervals
+                   cs.specs, c.filters, c.consumables, c.service_intervals, c.oil_hidden
             FROM cars c
             LEFT JOIN car_specs cs ON cs.car_id = c.id
             WHERE c.user_id = %s
@@ -88,6 +88,7 @@ def handler(event: dict, context) -> dict:
                 'filters': row[8] if row[8] is not None else [],
                 'consumables': row[9] if row[9] is not None else [],
                 'serviceIntervals': merged,
+                'oilHidden': bool(row[11]),
             })
         return resp(200, cars)
 
@@ -121,7 +122,7 @@ def handler(event: dict, context) -> dict:
         if action == 'update_car':
             car_id = body['id']
             fields, values = [], []
-            for key, col in [('brand','brand'),('model','model'),('year','year'),('oilInterval','oil_interval')]:
+            for key, col in [('brand','brand'),('model','model'),('year','year'),('oilInterval','oil_interval'),('oilHidden','oil_hidden')]:
                 if key in body:
                     fields.append(f'{col} = %s'); values.append(body[key])
             if 'guides' in body:

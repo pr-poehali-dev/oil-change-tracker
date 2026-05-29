@@ -274,6 +274,27 @@ export default function Index() {
     showNotif("Замена зафиксирована!");
   }
 
+  async function handleOilIntervalChange(km: number) {
+    if (!car) return;
+    setCustomCars((prev) => prev.map((c) => c.id === car.id ? { ...c, oilInterval: km } : c));
+    await apiUpdateCar(car.id, { oilInterval: km }).catch(() => {});
+    showNotif("Интервал замены масла обновлён");
+  }
+
+  async function handleOilDelete() {
+    if (!car) return;
+    setCustomCars((prev) => prev.map((c) => c.id === car.id ? { ...c, oilHidden: true } : c));
+    await apiUpdateCar(car.id, { oilHidden: true }).catch(() => {});
+    showNotif("Круг «Масло» удалён");
+  }
+
+  async function handleOilRestore() {
+    if (!car) return;
+    setCustomCars((prev) => prev.map((c) => c.id === car.id ? { ...c, oilHidden: false } : c));
+    await apiUpdateCar(car.id, { oilHidden: false }).catch(() => {});
+    showNotif("Круг «Масло» возвращён");
+  }
+
   async function handleRefreshFilters() {
     if (!car?.custom || filtersRefreshing) return;
     setFiltersRefreshing(true);
@@ -506,9 +527,13 @@ export default function Index() {
                 totalKm={totalKm}
                 oilInterval={OIL_INTERVAL}
                 intervals={car.serviceIntervals ?? []}
+                oilHidden={car.oilHidden}
                 onIntervalsLoaded={handleIntervalsLoaded}
                 onIntervalsChange={handleIntervalsLoaded}
                 onIntervalReset={handleIntervalReset}
+                onOilIntervalChange={handleOilIntervalChange}
+                onOilDelete={handleOilDelete}
+                onOilRestore={handleOilRestore}
               />
             )}
 

@@ -37,6 +37,7 @@ export type CarConfig = {
   engine?: string;
   transmission?: "auto" | "manual";
   oilInterval: number;
+  oilHidden?: boolean;
   guides: ManualGuide[];
   custom?: boolean;
   consumables?: Consumable[];
