@@ -23,8 +23,29 @@ interface Props {
   oilInterval: number;
   intervals: ServiceInterval[];
   onIntervalsLoaded: (intervals: ServiceInterval[]) => void;
+  onIntervalsChange: (intervals: ServiceInterval[]) => void;
   onIntervalReset: (id: string, date: string, km: number) => void;
 }
+
+const ICON_CHOICES = [
+  "Droplets", "Settings", "Cog", "GitFork", "Circle", "Gauge",
+  "AlertTriangle", "Thermometer", "Wind", "Zap", "Wrench", "Disc",
+  "Filter", "Battery", "Fuel", "Snowflake",
+];
+const COLOR_CHOICES = [
+  "#e05a2b", "#f97316", "#84cc16", "#a78bfa", "#fb923c", "#f43f5e",
+  "#38bdf8", "#f59e0b", "#06b6d4", "#10b981", "#8b5cf6", "#eab308", "#3b82f6",
+];
+
+type EditDraft = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  unit: "km" | "months";
+  interval_km: string;
+  interval_months: string;
+};
 
 function getProgress(item: ServiceInterval, totalKm: number): number {
   if (item.unit === "km" && item.interval_km) {
@@ -65,8 +86,9 @@ function getUrgency(p: number): "ok" | "warn" | "danger" {
   return p >= 1 ? "danger" : p >= 0.8 ? "warn" : "ok";
 }
 
-function Circle({ item, totalKm, oilInterval, onReset }: {
+function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelete }: {
   item: ServiceInterval; totalKm: number; oilInterval: number; onReset: () => void;
+  editMode?: boolean; onEdit?: () => void; onDelete?: () => void;
 }) {
   const isOil = item.id === "__oil__";
   const progress = isOil
@@ -88,12 +110,27 @@ function Circle({ item, totalKm, oilInterval, onReset }: {
     subLabel = getLastLabel(item);
   }
 
+  const canDelete = editMode && !isOil;
+
   return (
     <button
-      onClick={onReset}
-      className="flex flex-col items-center gap-2 flex-1 min-w-0 active:scale-95 transition-transform"
+      onClick={editMode ? (isOil ? undefined : onEdit) : onReset}
+      className="relative flex flex-col items-center gap-2 flex-1 min-w-0 active:scale-95 transition-transform"
       style={{ maxWidth: SIZE + 16 }}
     >
+      {canDelete && (
+        <span
+          onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+          className="absolute -top-1 right-1 z-10 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center shadow-md"
+        >
+          <Icon name="X" size={14} />
+        </span>
+      )}
+      {editMode && !isOil && (
+        <span className="absolute top-7 left-1/2 -translate-x-1/2 z-10 w-6 h-6 rounded-full bg-foreground/80 text-background flex items-center justify-center pointer-events-none">
+          <Icon name="Pencil" size={12} />
+        </span>
+      )}
       <div className="relative w-full" style={{ aspectRatio: "1 / 1", maxWidth: SIZE }}>
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
           <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="hsl(var(--secondary))" strokeWidth={STROKE} />
@@ -137,12 +174,15 @@ function Circle({ item, totalKm, oilInterval, onReset }: {
 export default function ServiceCircles({
   carId, brand, model, year, engine, transmission,
   totalKm, oilInterval, intervals,
-  onIntervalsLoaded, onIntervalReset,
+  onIntervalsLoaded, onIntervalsChange, onIntervalReset,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [resetTarget, setResetTarget] = useState<ServiceInterval | null>(null);
   const [resetDate, setResetDate] = useState("");
   const [resetKm, setResetKm] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
+  const [isNew, setIsNew] = useState(false);
   const [page, setPage] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -153,6 +193,60 @@ export default function ServiceCircles({
     setResetTarget(item);
     setResetDate(new Date().toISOString().split("T")[0]);
     setResetKm(String(totalKm));
+  }
+
+  const cleanIntervals = () => intervals.filter((i) => i.id !== "__oil__" && i.id !== "oil");
+
+  function openEditDraft(item: ServiceInterval) {
+    setIsNew(false);
+    setEditDraft({
+      id: item.id,
+      name: item.name,
+      icon: item.icon,
+      color: item.color,
+      unit: item.unit,
+      interval_km: item.interval_km != null ? String(item.interval_km) : "",
+      interval_months: item.interval_months != null ? String(item.interval_months) : "",
+    });
+  }
+
+  function openNewDraft() {
+    setIsNew(true);
+    setEditDraft({
+      id: "custom_" + Date.now(),
+      name: "",
+      icon: "Wrench",
+      color: COLOR_CHOICES[Math.floor(Math.random() * COLOR_CHOICES.length)],
+      unit: "km",
+      interval_km: "10000",
+      interval_months: "",
+    });
+  }
+
+  function saveDraft() {
+    if (!editDraft || !editDraft.name.trim()) return;
+    const km = editDraft.unit === "km" ? parseInt(editDraft.interval_km) || null : null;
+    const months = editDraft.unit === "months" ? parseInt(editDraft.interval_months) || null : null;
+    const built: ServiceInterval = {
+      id: editDraft.id,
+      name: editDraft.name.trim(),
+      icon: editDraft.icon,
+      color: editDraft.color,
+      unit: editDraft.unit,
+      interval_km: km,
+      interval_months: months,
+    };
+    const list = cleanIntervals();
+    const exists = list.some((i) => i.id === built.id);
+    const next = exists
+      ? list.map((i) => (i.id === built.id ? { ...i, ...built } : i))
+      : [...list, built];
+    onIntervalsChange(next);
+    setEditDraft(null);
+  }
+
+  function deleteInterval(id: string) {
+    onIntervalsChange(cleanIntervals().filter((i) => i.id !== id));
   }
 
   // Масляный круг всегда первый
@@ -166,9 +260,10 @@ export default function ServiceCircles({
     unit: "km",
   };
 
-  const allItems: ServiceInterval[] = [oilItem, ...intervals.filter((i) => i.id !== "__oil__" && i.id !== "oil")];
-  const totalPages = Math.ceil(allItems.length / PER_PAGE);
-  const pageItems = allItems.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+  const baseItems: ServiceInterval[] = [oilItem, ...intervals.filter((i) => i.id !== "__oil__" && i.id !== "oil")];
+  const ADD_TILE: ServiceInterval = { id: "__add__", name: "", icon: "Plus", color: "#888", interval_km: null, interval_months: null, unit: "km" };
+  const allItems: ServiceInterval[] = editMode ? [...baseItems, ADD_TILE] : baseItems;
+  const totalPages = Math.max(1, Math.ceil(allItems.length / PER_PAGE));
 
   function handleReset(item: ServiceInterval) {
     openReset(item);
@@ -274,17 +369,28 @@ export default function ServiceCircles({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm font-golos font-semibold text-foreground">Регламент обслуживания</p>
-          <button
-            onClick={loadIntervals}
-            disabled={loading}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 disabled:opacity-50"
-          >
-            {loading
-              ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" />
-              : <Icon name="RefreshCw" size={12} fallback="RefreshCw" />
-            }
-            {intervals.length === 0 ? "Загрузить ТО" : "Обновить"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setEditMode((v) => !v); setPage(0); }}
+              className={`text-xs transition-colors flex items-center gap-1 ${editMode ? "text-accent-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Icon name={editMode ? "Check" : "Pencil"} size={12} />
+              {editMode ? "Готово" : "Изменить"}
+            </button>
+            {!editMode && (
+              <button
+                onClick={loadIntervals}
+                disabled={loading}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {loading
+                  ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                  : <Icon name="RefreshCw" size={12} fallback="RefreshCw" />
+                }
+                {intervals.length === 0 ? "Загрузить ТО" : "Обновить"}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Circles slider */}
@@ -324,15 +430,34 @@ export default function ServiceCircles({
               const items = allItems.slice(pageIdx * PER_PAGE, pageIdx * PER_PAGE + PER_PAGE);
               return (
                 <div key={pageIdx} className="flex items-start py-2 gap-1 shrink-0 w-full">
-                  {items.map((item) => (
-                    <Circle
-                      key={item.id}
-                      item={item}
-                      totalKm={totalKm}
-                      oilInterval={oilInterval}
-                      onReset={() => handleReset(item)}
-                    />
-                  ))}
+                  {items.map((item) =>
+                    item.id === "__add__" ? (
+                      <button
+                        key="__add__"
+                        onClick={openNewDraft}
+                        className="flex flex-col items-center gap-2 flex-1 min-w-0 active:scale-95 transition-transform"
+                        style={{ maxWidth: SIZE + 16 }}
+                      >
+                        <div className="relative w-full flex items-center justify-center" style={{ aspectRatio: "1 / 1", maxWidth: SIZE }}>
+                          <div className="w-[72%] h-[72%] rounded-full border-2 border-dashed border-muted-foreground/40 flex items-center justify-center">
+                            <Icon name="Plus" size={26} className="text-muted-foreground" />
+                          </div>
+                        </div>
+                        <p className="text-xs font-golos font-semibold text-muted-foreground">Добавить</p>
+                      </button>
+                    ) : (
+                      <Circle
+                        key={item.id}
+                        item={item}
+                        totalKm={totalKm}
+                        oilInterval={oilInterval}
+                        onReset={() => handleReset(item)}
+                        editMode={editMode}
+                        onEdit={() => openEditDraft(item)}
+                        onDelete={() => deleteInterval(item.id)}
+                      />
+                    )
+                  )}
                   {items.length < PER_PAGE && Array.from({ length: PER_PAGE - items.length }).map((_, i) => (
                     <div key={`empty-${i}`} className="flex-1" />
                   ))}
@@ -361,9 +486,136 @@ export default function ServiceCircles({
         )}
 
         <p className="text-xs text-muted-foreground font-golos mt-3 text-center">
-          Нажми на круг — отметить замену
+          {editMode ? "Нажми на круг — редактировать, ✕ — удалить" : "Нажми на круг — отметить замену"}
         </p>
       </div>
+
+      {/* Модалка редактора круга */}
+      {editDraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="bg-card rounded-3xl border border-border p-6 w-full max-w-sm shadow-xl max-h-[88vh] overflow-y-auto">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background: editDraft.color + "20" }}>
+                <Icon name={editDraft.icon as "Droplets"} size={20} style={{ color: editDraft.color }} fallback="Wrench" />
+              </div>
+              <p className="font-golos font-bold text-foreground text-lg leading-tight">
+                {isNew ? "Новый круг" : "Редактировать круг"}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-golos text-muted-foreground mb-1">Название</label>
+                <input
+                  type="text"
+                  value={editDraft.name}
+                  maxLength={20}
+                  onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                  placeholder="Напр. Масло АКПП"
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-golos text-muted-foreground mb-1.5">Иконка</label>
+                <div className="grid grid-cols-8 gap-1.5">
+                  {ICON_CHOICES.map((ic) => (
+                    <button
+                      key={ic}
+                      onClick={() => setEditDraft({ ...editDraft, icon: ic })}
+                      className={`aspect-square rounded-lg flex items-center justify-center border transition-colors ${editDraft.icon === ic ? "border-foreground bg-secondary" : "border-border"}`}
+                    >
+                      <Icon name={ic as "Droplets"} size={16} className="text-foreground" fallback="Wrench" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-golos text-muted-foreground mb-1.5">Цвет</label>
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_CHOICES.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setEditDraft({ ...editDraft, color: c })}
+                      className="w-7 h-7 rounded-full transition-transform active:scale-90"
+                      style={{ background: c, outline: editDraft.color === c ? "2px solid hsl(var(--foreground))" : "none", outlineOffset: 2 }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-golos text-muted-foreground mb-1.5">Замена по</label>
+                <div className="flex gap-1 bg-secondary rounded-xl p-1">
+                  <button
+                    onClick={() => setEditDraft({ ...editDraft, unit: "km" })}
+                    className={`flex-1 py-2 rounded-lg text-sm font-golos font-medium transition-all ${editDraft.unit === "km" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
+                  >
+                    Пробегу (км)
+                  </button>
+                  <button
+                    onClick={() => setEditDraft({ ...editDraft, unit: "months" })}
+                    className={`flex-1 py-2 rounded-lg text-sm font-golos font-medium transition-all ${editDraft.unit === "months" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
+                  >
+                    Времени (мес)
+                  </button>
+                </div>
+              </div>
+
+              {editDraft.unit === "km" ? (
+                <div>
+                  <label className="block text-xs font-golos text-muted-foreground mb-1">Интервал, км</label>
+                  <input
+                    type="number" min={0}
+                    value={editDraft.interval_km}
+                    onChange={(e) => setEditDraft({ ...editDraft, interval_km: e.target.value })}
+                    placeholder="10000"
+                    className="w-full px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-golos text-muted-foreground mb-1">Интервал, месяцев</label>
+                  <input
+                    type="number" min={0}
+                    value={editDraft.interval_months}
+                    onChange={(e) => setEditDraft({ ...editDraft, interval_months: e.target.value })}
+                    placeholder="12"
+                    className="w-full px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 space-y-2">
+              <button
+                onClick={saveDraft}
+                disabled={!editDraft.name.trim()}
+                className="w-full py-3 rounded-xl text-sm font-golos font-semibold disabled:opacity-40"
+                style={{ background: editDraft.color, color: "#fff" }}
+              >
+                {isNew ? "Добавить круг" : "Сохранить"}
+              </button>
+              {!isNew && (
+                <button
+                  onClick={() => { deleteInterval(editDraft.id); setEditDraft(null); }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-destructive/30 bg-destructive/5 text-destructive text-sm font-golos font-semibold"
+                >
+                  <Icon name="Trash2" size={15} className="text-destructive" />
+                  Удалить круг
+                </button>
+              )}
+              <button
+                onClick={() => setEditDraft(null)}
+                className="w-full py-3 rounded-xl bg-secondary text-foreground text-sm font-golos font-medium"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

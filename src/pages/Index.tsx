@@ -507,6 +507,7 @@ export default function Index() {
                 oilInterval={OIL_INTERVAL}
                 intervals={car.serviceIntervals ?? []}
                 onIntervalsLoaded={handleIntervalsLoaded}
+                onIntervalsChange={handleIntervalsLoaded}
                 onIntervalReset={handleIntervalReset}
               />
             )}
