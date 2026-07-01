@@ -509,6 +509,16 @@ export default function ServiceCircles({
         <p className="text-xs text-muted-foreground font-golos mt-3 text-center">
           {editMode ? "Нажми на круг — редактировать, ✕ — удалить" : "Нажми на круг — отметить замену"}
         </p>
+
+        {editMode && (
+          <button
+            onClick={() => { setEditMode(false); setPage(0); }}
+            className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl bg-foreground text-background text-sm font-golos font-semibold active:scale-95 transition-transform"
+          >
+            <Icon name="Check" size={16} />
+            Выйти из редактирования
+          </button>
+        )}
       </div>
 
       {/* Модалка редактора круга */}
