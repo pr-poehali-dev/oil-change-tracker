@@ -642,6 +642,7 @@ export const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
   },
   "Honda": {
     "Civic": [
+      { name: "EF/ED (4th)", years: "1987–1991" },
       { name: "EG/EH (5th)", years: "1991–1995" },
       { name: "EK (6th)", years: "1995–2001" },
       { name: "EP/EU/ES (7th)", years: "2000–2005" },
