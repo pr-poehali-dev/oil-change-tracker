@@ -126,13 +126,13 @@ function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelet
           style={{ transition: "stroke-dashoffset 0.5s ease, stroke 0.3s ease" }}
         />
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, paddingLeft: 6, paddingRight: 6 }}>
         {isOil ? (
           <>
-            <span className="font-mono font-semibold text-foreground leading-none" style={{ fontSize: vertical ? 20 : 16 }}>
+            <span className="font-mono font-semibold text-foreground leading-none" style={{ fontSize: vertical ? 14 : 16 }}>
               {totalKm.toLocaleString("ru-RU")}
             </span>
-            <span className="font-mono text-muted-foreground leading-none" style={{ fontSize: vertical ? 13 : 12 }}>
+            <span className="font-mono text-muted-foreground leading-none" style={{ fontSize: vertical ? 10 : 12 }}>
               из {oilInterval.toLocaleString("ru-RU")}
             </span>
           </>
