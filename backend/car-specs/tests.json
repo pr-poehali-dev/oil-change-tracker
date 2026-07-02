@@ -26,6 +26,20 @@
       "path": "/",
       "body": {},
       "expectedStatus": 400
+    },
+    {
+      "name": "VIN декодирование Toyota",
+      "method": "POST",
+      "path": "/",
+      "body": { "mode": "vin", "vin": "JTDBR32E230012345" },
+      "expectedStatus": 200
+    },
+    {
+      "name": "VIN невалидная длина",
+      "method": "POST",
+      "path": "/",
+      "body": { "mode": "vin", "vin": "12345" },
+      "expectedStatus": 200
     }
   ]
 }

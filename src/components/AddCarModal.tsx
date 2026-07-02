@@ -37,6 +37,10 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   const [interval, setInterval] = useState("");
   const [transmission, setTransmission] = useState<"auto" | "manual" | "">("");
 
+  const [vin, setVin] = useState("");
+  const [vinLoading, setVinLoading] = useState(false);
+  const [vinResult, setVinResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const [engines, setEngines] = useState<Engine[]>([]);
   const [selectedEngine, setSelectedEngine] = useState<Engine | null>(null);
   const [enginesLoading, setEnginesLoading] = useState(false);
@@ -89,6 +93,53 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     resetOnCarChange();
     setModel("");
     setGeneration(null);
+  }
+
+  async function decodeVin() {
+    const v = vin.trim().toUpperCase();
+    if (v.length !== 17) {
+      setVinResult({ ok: false, msg: "VIN должен содержать ровно 17 символов" });
+      return;
+    }
+    setVinLoading(true);
+    setVinResult(null);
+    try {
+      const res = await fetch(CAR_SPECS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "vin", vin: v }),
+      });
+      const data = await res.json();
+      if (!data.valid) {
+        setVinResult({ ok: false, msg: data.error || "Не удалось распознать VIN" });
+        return;
+      }
+      // Сопоставляем бренд с нашей базой (регистронезависимо)
+      const matchedBrand = data.brand
+        ? CAR_BRANDS.find((b) => b.toLowerCase() === data.brand.toLowerCase())
+        : "";
+      const parts: string[] = [];
+      if (matchedBrand) {
+        selectBrand(matchedBrand);
+        parts.push(matchedBrand);
+      } else if (data.brand) {
+        parts.push(`${data.brand} (нет в списке)`);
+      }
+      if (data.year) {
+        setYear(data.year);
+        parts.push(data.year);
+      }
+      if (data.country) parts.push(data.country);
+      if (parts.length && (matchedBrand || data.year)) {
+        setVinResult({ ok: true, msg: `Определено: ${parts.join(", ")}. Укажите модель вручную.` });
+      } else {
+        setVinResult({ ok: false, msg: "VIN валиден, но марку не удалось определить. Заполните вручную." });
+      }
+    } catch {
+      setVinResult({ ok: false, msg: "Ошибка сети. Попробуйте позже." });
+    } finally {
+      setVinLoading(false);
+    }
   }
 
   function handleModelChange(value: string) {
@@ -266,6 +317,46 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         </div>
 
         <div className="space-y-3">
+          {/* VIN (опционально) */}
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">
+              VIN / номер кузова <span className="text-muted-foreground/60 normal-case">— необязательно</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={vin}
+                onChange={(e) => { setVin(e.target.value.toUpperCase().slice(0, 17)); setVinResult(null); }}
+                placeholder="Напр. JTDBR32E230012345"
+                maxLength={17}
+                autoCapitalize="characters"
+                className="flex-1 min-w-0 bg-secondary rounded-xl px-4 py-3 text-sm font-mono tracking-wider text-foreground placeholder:text-muted-foreground placeholder:font-golos placeholder:tracking-normal border border-transparent focus:outline-none focus:border-ring transition-colors"
+              />
+              <button
+                type="button"
+                onClick={decodeVin}
+                disabled={vinLoading || vin.trim().length !== 17}
+                className="shrink-0 px-4 rounded-xl bg-foreground text-background text-sm font-golos font-semibold disabled:opacity-40 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              >
+                {vinLoading
+                  ? <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                  : <Icon name="Search" size={15} />}
+                Найти
+              </button>
+            </div>
+            {vinResult && (
+              <p className={`text-xs font-golos mt-1.5 flex items-start gap-1 ${vinResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                <Icon name={vinResult.ok ? "CircleCheck" : "CircleAlert"} size={13} className="shrink-0 mt-0.5" />
+                {vinResult.msg}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-border flex-1" />
+            <span className="text-xs font-golos text-muted-foreground">или вручную</span>
+            <div className="h-px bg-border flex-1" />
+          </div>
+
           {/* Марка */}
           <div ref={brandRef} className="relative">
             <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">Марка</label>

@@ -5,6 +5,7 @@ import urllib.request
 import urllib.parse
 import psycopg2  # noqa: F401 — required, installed via requirements.txt
 from engines_db import ENGINES_DB
+from vin_decoder import decode_vin
 
 SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 't_p21156567_oil_change_tracker')
 
@@ -31,6 +32,12 @@ def handler(event: dict, context) -> dict:
     mode = body.get('mode', '').strip()
     car_id = body.get('carId', '').strip()
     force_refresh = body.get('forceRefresh', False)
+
+    if mode == 'vin':
+        vin = body.get('vin', '').strip()
+        result = decode_vin(vin)
+        print(f"VIN decode: {vin} -> {result.get('brand')} {result.get('year')}")
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
