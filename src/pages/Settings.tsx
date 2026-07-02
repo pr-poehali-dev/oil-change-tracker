@@ -13,14 +13,24 @@ function applyTheme(theme: "light" | "dark") {
   localStorage.setItem("theme", theme);
 }
 
+function getCirclesLayout(): "horizontal" | "vertical" {
+  return (localStorage.getItem("circlesLayout") as "horizontal" | "vertical") || "horizontal";
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const { user, logout } = useContext(AuthContext);
   const [theme, setTheme] = useState<"light" | "dark">(getTheme);
+  const [circlesLayout, setCirclesLayout] = useState<"horizontal" | "vertical">(getCirclesLayout);
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("circlesLayout", circlesLayout);
+    window.dispatchEvent(new Event("circlesLayoutChange"));
+  }, [circlesLayout]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -54,6 +64,26 @@ export default function Settings() {
               className={`relative w-12 h-7 rounded-full transition-colors ${theme === "dark" ? "bg-accent" : "bg-muted"}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${theme === "dark" ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
+                <Icon name={circlesLayout === "vertical" ? "Rows3" : "Columns3"} size={18} fallback="LayoutGrid" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Крупные круги списком</p>
+                <p className="text-xs text-muted-foreground">Вертикально с прокруткой вместо строки</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setCirclesLayout(circlesLayout === "vertical" ? "horizontal" : "vertical")}
+              className={`relative w-12 h-7 rounded-full transition-colors ${circlesLayout === "vertical" ? "bg-accent" : "bg-muted"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${circlesLayout === "vertical" ? "translate-x-5" : "translate-x-0"}`} />
             </button>
           </div>
         </div>

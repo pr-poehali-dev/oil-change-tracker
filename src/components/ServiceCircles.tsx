@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { ServiceInterval } from "@/lib/cars";
 
@@ -90,9 +90,9 @@ function getUrgency(p: number): "ok" | "warn" | "danger" {
   return p >= 1 ? "danger" : p >= 0.8 ? "warn" : "ok";
 }
 
-function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelete }: {
+function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelete, vertical }: {
   item: ServiceInterval; totalKm: number; oilInterval: number; onReset: () => void;
-  editMode?: boolean; onEdit?: () => void; onDelete?: () => void;
+  editMode?: boolean; onEdit?: () => void; onDelete?: () => void; vertical?: boolean;
 }) {
   const isOil = item.id === "__oil__";
   const progress = isOil
@@ -114,6 +114,68 @@ function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelet
     subLabel = getLastLabel(item);
   }
 
+  const circleSvg = (dim: number) => (
+    <div className="relative shrink-0" style={{ width: dim, height: dim }}>
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+        <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="hsl(var(--secondary))" strokeWidth={STROKE} />
+        <circle
+          cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none"
+          stroke={color} strokeWidth={STROKE} strokeLinecap="round"
+          strokeDasharray={CIRC} strokeDashoffset={dash}
+          transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+          style={{ transition: "stroke-dashoffset 0.5s ease, stroke 0.3s ease" }}
+        />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
+        {isOil ? (
+          <>
+            <span className="font-mono font-semibold text-foreground leading-none" style={{ fontSize: vertical ? 20 : 16 }}>
+              {totalKm.toLocaleString("ru-RU")}
+            </span>
+            <span className="font-mono text-muted-foreground leading-none" style={{ fontSize: vertical ? 13 : 12 }}>
+              из {oilInterval.toLocaleString("ru-RU")}
+            </span>
+          </>
+        ) : (
+          <>
+            <Icon name={item.icon as "Droplets"} size={vertical ? 26 : 18} style={{ color }} fallback="Wrench" />
+            {urgency === "danger" && (
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse mt-0.5" style={{ background: color }} />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  // Вертикальный список: круг слева, текст справа, крупнее
+  if (vertical) {
+    return (
+      <button
+        onClick={editMode ? onEdit : onReset}
+        className="relative flex items-center gap-4 w-full active:scale-[0.98] transition-transform bg-secondary/40 rounded-2xl p-3 text-left"
+      >
+        {editMode && (
+          <span
+            onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+            className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-destructive text-white flex items-center justify-center shadow-md"
+          >
+            <Icon name="X" size={15} />
+          </span>
+        )}
+        {circleSvg(84)}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center gap-2">
+            <p className="text-base font-golos font-semibold text-foreground leading-tight truncate">{item.name}</p>
+            {editMode && <Icon name="Pencil" size={13} className="text-muted-foreground shrink-0" />}
+          </div>
+          <p className="text-sm font-mono leading-tight" style={{ color }}>{mainLabel}</p>
+          <p className="text-xs font-mono text-muted-foreground leading-tight truncate">{subLabel}</p>
+        </div>
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={editMode ? onEdit : onReset}
@@ -133,36 +195,8 @@ function Circle({ item, totalKm, oilInterval, onReset, editMode, onEdit, onDelet
           <Icon name="Pencil" size={12} />
         </span>
       )}
-      <div className="relative w-full" style={{ aspectRatio: "1 / 1", maxWidth: SIZE }}>
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="hsl(var(--secondary))" strokeWidth={STROKE} />
-          <circle
-            cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none"
-            stroke={color} strokeWidth={STROKE} strokeLinecap="round"
-            strokeDasharray={CIRC} strokeDashoffset={dash}
-            transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
-            style={{ transition: "stroke-dashoffset 0.5s ease, stroke 0.3s ease" }}
-          />
-        </svg>
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
-          {isOil ? (
-            <>
-              <span className="font-mono text-base font-semibold text-foreground leading-none">
-                {totalKm.toLocaleString("ru-RU")}
-              </span>
-              <span className="font-mono text-xs text-muted-foreground leading-none">
-                из {oilInterval.toLocaleString("ru-RU")}
-              </span>
-            </>
-          ) : (
-            <>
-              <Icon name={item.icon as "Droplets"} size={18} style={{ color }} fallback="Wrench" />
-              {urgency === "danger" && (
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse mt-0.5" style={{ background: color }} />
-              )}
-            </>
-          )}
-        </div>
+      <div className="relative w-full flex items-center justify-center" style={{ aspectRatio: "1 / 1", maxWidth: SIZE }}>
+        {circleSvg(SIZE)}
       </div>
       <div className="text-center space-y-0.5 w-full px-1">
         <p className="text-xs font-golos font-semibold text-foreground leading-tight truncate">{item.name}</p>
@@ -191,6 +225,19 @@ export default function ServiceCircles({
   const [dragging, setDragging] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<"horizontal" | "vertical">(
+    () => (typeof localStorage !== "undefined" && localStorage.getItem("circlesLayout") === "vertical") ? "vertical" : "horizontal"
+  );
+
+  useEffect(() => {
+    const sync = () => setLayout(localStorage.getItem("circlesLayout") === "vertical" ? "vertical" : "horizontal");
+    window.addEventListener("circlesLayoutChange", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("circlesLayoutChange", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   function openReset(item: ServiceInterval) {
     setResetTarget(item);
@@ -404,6 +451,40 @@ export default function ServiceCircles({
           </div>
         </div>
 
+        {/* Vertical scrollable list */}
+        {layout === "vertical" ? (
+          <div className="flex flex-col gap-2.5 max-h-[70vh] overflow-y-auto py-1 pr-0.5 -mr-0.5">
+            {allItems.map((item) =>
+              item.id === "__add__" ? (
+                <button
+                  key="__add__"
+                  onClick={openNewDraft}
+                  className="flex items-center gap-4 w-full active:scale-[0.98] transition-transform bg-secondary/40 rounded-2xl p-3 text-left"
+                >
+                  <div className="shrink-0 flex items-center justify-center" style={{ width: 84, height: 84 }}>
+                    <div className="w-16 h-16 rounded-full border-2 border-dashed border-muted-foreground/40 flex items-center justify-center">
+                      <Icon name="Plus" size={26} className="text-muted-foreground" />
+                    </div>
+                  </div>
+                  <p className="text-base font-golos font-semibold text-muted-foreground">Добавить круг</p>
+                </button>
+              ) : (
+                <Circle
+                  key={item.id}
+                  item={item}
+                  totalKm={totalKm}
+                  oilInterval={oilInterval}
+                  onReset={() => handleReset(item)}
+                  editMode={editMode}
+                  onEdit={() => openEditDraft(item)}
+                  onDelete={() => deleteInterval(item.id)}
+                  vertical
+                />
+              )
+            )}
+          </div>
+        ) : (
+        <>
         {/* Circles slider */}
         <div
           ref={containerRef}
@@ -495,6 +576,8 @@ export default function ServiceCircles({
             ))}
           </div>
         )}
+        </>
+        )}
 
         {editMode && oilHidden && (
           <button
@@ -507,7 +590,11 @@ export default function ServiceCircles({
         )}
 
         <p className="text-xs text-muted-foreground font-golos mt-3 text-center">
-          {editMode ? "Нажми на круг — редактировать, ✕ — удалить" : "Нажми на круг — отметить замену"}
+          {editMode
+            ? "Нажми на круг — редактировать, ✕ — удалить"
+            : layout === "vertical"
+              ? "Листай список · нажми на круг — отметить замену"
+              : "Нажми на круг — отметить замену"}
         </p>
 
         {editMode && (
