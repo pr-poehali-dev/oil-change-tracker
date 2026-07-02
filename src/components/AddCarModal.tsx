@@ -97,8 +97,8 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
 
   async function decodeVin() {
     const v = vin.trim().toUpperCase();
-    if (v.length !== 17) {
-      setVinResult({ ok: false, msg: "VIN должен содержать ровно 17 символов" });
+    if (v.length < 3) {
+      setVinResult({ ok: false, msg: "Введите VIN (17 символов) или номер кузова" });
       return;
     }
     setVinLoading(true);
@@ -111,7 +111,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       });
       const data = await res.json();
       if (!data.valid) {
-        setVinResult({ ok: false, msg: data.error || "Не удалось распознать VIN" });
+        setVinResult({ ok: false, msg: data.error || "Не удалось распознать номер" });
         return;
       }
       // Сопоставляем бренд с нашей базой (регистронезависимо)
@@ -125,15 +125,29 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       } else if (data.brand) {
         parts.push(`${data.brand} (нет в списке)`);
       }
+      // Модель (из японского кода кузова). Ставим после selectBrand — он очищает модель.
+      let matchedModel = "";
+      if (data.model && matchedBrand) {
+        const models = CAR_MODELS[matchedBrand] ?? [];
+        matchedModel = models.find((m) => m.toLowerCase() === data.model.toLowerCase()) || data.model;
+        setModel(matchedModel);
+        setModelSuggestions([]);
+        setShowModelDropdown(false);
+        parts.push(matchedModel);
+      }
       if (data.year) {
         setYear(data.year);
         parts.push(data.year);
       }
-      if (data.country) parts.push(data.country);
+      if (data.country && !data.model) parts.push(data.country);
       if (parts.length && (matchedBrand || data.year)) {
-        setVinResult({ ok: true, msg: `Определено: ${parts.join(", ")}. Укажите модель вручную.` });
+        const needModel = matchedBrand && !matchedModel;
+        setVinResult({
+          ok: true,
+          msg: `Определено: ${parts.join(", ")}.` + (needModel ? " Укажите модель вручную." : ""),
+        });
       } else {
-        setVinResult({ ok: false, msg: "VIN валиден, но марку не удалось определить. Заполните вручную." });
+        setVinResult({ ok: false, msg: "Марку определить не удалось. Заполните вручную." });
       }
     } catch {
       setVinResult({ ok: false, msg: "Ошибка сети. Попробуйте позже." });
@@ -325,16 +339,16 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
             <div className="flex gap-2">
               <input
                 value={vin}
-                onChange={(e) => { setVin(e.target.value.toUpperCase().slice(0, 17)); setVinResult(null); }}
-                placeholder="Напр. JTDBR32E230012345"
-                maxLength={17}
+                onChange={(e) => { setVin(e.target.value.toUpperCase().slice(0, 20)); setVinResult(null); }}
+                placeholder="VIN или № кузова (GX110-...)"
+                maxLength={20}
                 autoCapitalize="characters"
                 className="flex-1 min-w-0 bg-secondary rounded-xl px-4 py-3 text-sm font-mono tracking-wider text-foreground placeholder:text-muted-foreground placeholder:font-golos placeholder:tracking-normal border border-transparent focus:outline-none focus:border-ring transition-colors"
               />
               <button
                 type="button"
                 onClick={decodeVin}
-                disabled={vinLoading || vin.trim().length !== 17}
+                disabled={vinLoading || vin.trim().length < 3}
                 className="shrink-0 px-4 rounded-xl bg-foreground text-background text-sm font-golos font-semibold disabled:opacity-40 active:scale-95 transition-all flex items-center justify-center gap-1.5"
               >
                 {vinLoading

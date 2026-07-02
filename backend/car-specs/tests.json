@@ -40,6 +40,20 @@
       "path": "/",
       "body": { "mode": "vin", "vin": "12345" },
       "expectedStatus": 200
+    },
+    {
+      "name": "Код кузова Toyota GX110",
+      "method": "POST",
+      "path": "/",
+      "body": { "mode": "vin", "vin": "GX110-6001234" },
+      "expectedStatus": 200
+    },
+    {
+      "name": "Код кузова Nissan ER34",
+      "method": "POST",
+      "path": "/",
+      "body": { "mode": "vin", "vin": "ER34" },
+      "expectedStatus": 200
     }
   ]
 }
