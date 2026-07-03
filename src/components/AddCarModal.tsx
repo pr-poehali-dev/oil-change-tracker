@@ -95,6 +95,20 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setGeneration(null);
   }
 
+  function findGenerationByYear(b: string, m: string, y: string): Generation | null {
+    const gens = CAR_GENERATIONS[b]?.[m];
+    if (!gens || !gens.length) return null;
+    const yr = parseInt(y, 10);
+    if (!yr) return null;
+    for (const g of gens) {
+      const [rawStart, rawEnd] = g.years.split(/[–-]/).map((s) => s.trim());
+      const start = parseInt(rawStart, 10);
+      const end = !rawEnd || rawEnd.includes("н.в") ? new Date().getFullYear() + 1 : parseInt(rawEnd, 10);
+      if (start && yr >= start && yr <= end) return g;
+    }
+    return null;
+  }
+
   async function decodeVin() {
     const v = vin.trim().toUpperCase();
     if (v.length < 3) {
@@ -135,17 +149,35 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         setShowModelDropdown(false);
         parts.push(matchedModel);
       }
-      if (data.year) {
-        setYear(data.year);
-        parts.push(data.year);
+      const matchedYear = data.year || "";
+      if (matchedYear) {
+        setYear(matchedYear);
+        parts.push(matchedYear);
       }
       if (data.country && !data.model) parts.push(data.country);
-      if (parts.length && (matchedBrand || data.year)) {
+
+      // Подбираем поколение (кузов) по году и сразу грузим двигатели
+      let matchedGen: Generation | null = null;
+      if (matchedBrand && matchedModel && matchedYear) {
+        matchedGen = findGenerationByYear(matchedBrand, matchedModel, matchedYear);
+        if (matchedGen) {
+          setGeneration(matchedGen);
+          parts.push(`кузов ${matchedGen.name}`);
+        }
+      }
+
+      if (parts.length && (matchedBrand || matchedYear)) {
+        const canAutoEngines = matchedBrand && matchedModel && matchedYear.length === 4;
         const needModel = matchedBrand && !matchedModel;
         setVinResult({
           ok: true,
-          msg: `Определено: ${parts.join(", ")}.` + (needModel ? " Укажите модель вручную." : ""),
+          msg: `Определено: ${parts.join(", ")}.`
+            + (needModel ? " Укажите модель вручную." : "")
+            + (canAutoEngines ? " Подбираю двигатели..." : ""),
         });
+        if (canAutoEngines) {
+          handleFetchEngines({ brand: matchedBrand, model: matchedModel, year: matchedYear, generation: matchedGen });
+        }
       } else {
         setVinResult({ ok: false, msg: "Марку определить не удалось. Заполните вручную." });
       }
@@ -205,7 +237,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setDbCarId(null);
   }
 
-  async function handleFetchEngines() {
+  async function handleFetchEngines(override?: { brand?: string; model?: string; year?: string; generation?: Generation | null }) {
     setEnginesLoading(true);
     setEnginesError("");
     setEnginesLoaded(false);
@@ -216,11 +248,15 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setFromDb(false);
     setDbCarId(null);
     try {
-      const genName = generation?.name;
+      const b = (override?.brand ?? brand).trim();
+      const m = (override?.model ?? model).trim();
+      const y = (override?.year ?? year).trim();
+      const gen = override && "generation" in override ? override.generation : generation;
+      const genName = gen?.name;
       const res = await fetch(CAR_SPECS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand: brand.trim(), model: model.trim(), year: year.trim(), mode: "engines", ...(genName ? { generation: genName } : {}) }),
+        body: JSON.stringify({ brand: b, model: m, year: y, mode: "engines", ...(genName ? { generation: genName } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка сервера");
@@ -499,7 +535,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
 
           {!enginesLoaded && (
             <button
-              onClick={handleFetchEngines}
+              onClick={() => handleFetchEngines()}
               disabled={!canFetchEngines || enginesLoading}
               className="w-full py-3 rounded-xl border border-ring/40 bg-secondary text-sm font-golos font-medium text-foreground flex items-center justify-center gap-2 hover:bg-muted transition-colors disabled:opacity-40 disabled:pointer-events-none"
             >
