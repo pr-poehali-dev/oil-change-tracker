@@ -39,6 +39,14 @@ def handler(event: dict, context) -> dict:
         print(f"VIN decode: {vin} -> {result.get('brand')} {result.get('year')}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
+    if mode == 'sts_photo':
+        image_b64 = body.get('image', '')
+        if not image_b64:
+            return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'valid': False, 'error': 'Фото не передано'}, ensure_ascii=False)}
+        result = _recognize_sts_photo(image_b64)
+        print(f"STS photo decode -> {result.get('brand')} {result.get('model')} {result.get('year')} valid={result.get('valid')}")
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
+
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
@@ -1108,6 +1116,79 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
     except Exception as e:
         print(f"AI parse failed: {e}, raw: {str(data)[:300]}")
         return _fallback(prompt)
+
+
+def _recognize_sts_photo(image_b64: str) -> dict:
+    """Распознаёт данные авто по фото СТС через OpenAI Vision.
+
+    Возвращает {brand, model, year, vin, volume, power, valid, error}.
+    """
+    api_key = os.environ.get('OPENAI_API_KEY', '')
+    if not api_key:
+        return {'valid': False, 'error': 'Распознавание временно недоступно', 'brand': '', 'model': '', 'year': '', 'vin': ''}
+
+    # Отсекаем префикс data:image/...;base64, если он есть
+    if ',' in image_b64 and image_b64.strip().startswith('data:'):
+        image_b64 = image_b64.split(',', 1)[1]
+
+    prompt_text = (
+        "На фото — российское свидетельство о регистрации ТС (СТС) или ПТС. "
+        "Распознай данные автомобиля и верни СТРОГО валидный JSON без markdown:\n"
+        '{"brand":"марка латиницей (Toyota, BMW...)","model":"модель","year":"год выпуска 4 цифры",'
+        '"vin":"VIN 17 символов","volume":"объём двигателя в литрах, напр 2.0","power":"мощность в л.с., только число"}\n'
+        "Правила: марку пиши латиницей в общепринятом виде. Если поле не читается — оставь пустую строку. "
+        "Объём переведи из см³ в литры (1998 см³ -> 2.0). Мощность бери в л.с. (не кВт). "
+        "Только JSON, ничего лишнего."
+    )
+
+    payload = json.dumps({
+        'model': 'gpt-4o-mini',
+        'max_tokens': 400,
+        'temperature': 0,
+        'messages': [
+            {
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': prompt_text},
+                    {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{image_b64}'}},
+                ],
+            },
+        ],
+    }).encode('utf-8')
+
+    try:
+        r = urllib.request.Request(
+            'https://api.openai.com/v1/chat/completions',
+            data=payload,
+            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+            method='POST',
+        )
+        with urllib.request.urlopen(r, timeout=40) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        content = data['choices'][0]['message']['content'].strip()
+        if content.startswith('```'):
+            lines = content.split('\n')
+            content = '\n'.join(lines[1:])
+            if '```' in content:
+                content = content[:content.rfind('```')].strip()
+        parsed = json.loads(content)
+        result = {
+            'valid': True,
+            'error': '',
+            'brand': str(parsed.get('brand') or '').strip(),
+            'model': str(parsed.get('model') or '').strip(),
+            'year': str(parsed.get('year') or '').strip(),
+            'vin': str(parsed.get('vin') or '').strip().upper(),
+            'volume': str(parsed.get('volume') or '').strip(),
+            'power': str(parsed.get('power') or '').strip(),
+        }
+        if not (result['brand'] or result['vin']):
+            result['valid'] = False
+            result['error'] = 'Не удалось распознать данные. Сфотографируйте СТС чётче.'
+        return result
+    except Exception as e:
+        print(f"STS recognize failed: {e}")
+        return {'valid': False, 'error': 'Не удалось распознать фото. Попробуйте ещё раз.', 'brand': '', 'model': '', 'year': '', 'vin': ''}
 
 
 def _fallback(prompt: str) -> dict:

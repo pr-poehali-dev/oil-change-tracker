@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, ChangeEvent } from "react";
 import Icon from "@/components/ui/icon";
 import { CarConfig, ManualGuide, ManualStep, generateCarId } from "@/lib/cars";
 import { apiSearchCar } from "@/api";
@@ -40,6 +40,10 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   const [vin, setVin] = useState("");
   const [vinLoading, setVinLoading] = useState(false);
   const [vinResult, setVinResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const [stsLoading, setStsLoading] = useState(false);
+  const stsCameraRef = useRef<HTMLInputElement>(null);
+  const stsGalleryRef = useRef<HTMLInputElement>(null);
 
   const [engines, setEngines] = useState<Engine[]>([]);
   const [selectedEngine, setSelectedEngine] = useState<Engine | null>(null);
@@ -109,6 +113,68 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     return null;
   }
 
+  // Общая логика: заполняет форму по распознанным данным (VIN / код кузова / СТС)
+  // и запускает подбор двигателей. Возвращает {ok, msg} для показа пользователю.
+  function applyRecognized(data: {
+    brand?: string; model?: string; year?: string; country?: string;
+  }): { ok: boolean; msg: string } {
+    const matchedBrand = data.brand
+      ? CAR_BRANDS.find((b) => b.toLowerCase() === data.brand!.toLowerCase())
+      : "";
+    const parts: string[] = [];
+    if (matchedBrand) {
+      selectBrand(matchedBrand);
+      parts.push(matchedBrand);
+    } else if (data.brand) {
+      parts.push(`${data.brand} (нет в списке)`);
+    }
+    // Модель. Ставим после selectBrand — он очищает модель.
+    let matchedModel = "";
+    if (data.model && matchedBrand) {
+      const models = CAR_MODELS[matchedBrand] ?? [];
+      matchedModel = models.find((m) => m.toLowerCase() === data.model!.toLowerCase()) || data.model;
+      setModel(matchedModel);
+      setModelSuggestions([]);
+      setShowModelDropdown(false);
+      parts.push(matchedModel);
+    } else if (data.model && !matchedBrand) {
+      setModel(data.model);
+      matchedModel = data.model;
+      parts.push(data.model);
+    }
+    const matchedYear = data.year || "";
+    if (matchedYear) {
+      setYear(matchedYear);
+      parts.push(matchedYear);
+    }
+    if (data.country && !data.model) parts.push(data.country);
+
+    // Подбираем поколение (кузов) по году и сразу грузим двигатели
+    let matchedGen: Generation | null = null;
+    if (matchedBrand && matchedModel && matchedYear) {
+      matchedGen = findGenerationByYear(matchedBrand, matchedModel, matchedYear);
+      if (matchedGen) {
+        setGeneration(matchedGen);
+        parts.push(`кузов ${matchedGen.name}`);
+      }
+    }
+
+    if (parts.length && (matchedBrand || matchedYear)) {
+      const canAutoEngines = !!(matchedBrand && matchedModel && matchedYear.length === 4);
+      const needModel = matchedBrand && !matchedModel;
+      if (canAutoEngines) {
+        handleFetchEngines({ brand: matchedBrand as string, model: matchedModel, year: matchedYear, generation: matchedGen });
+      }
+      return {
+        ok: true,
+        msg: `Определено: ${parts.join(", ")}.`
+          + (needModel ? " Укажите модель вручную." : "")
+          + (canAutoEngines ? " Подбираю двигатели..." : ""),
+      };
+    }
+    return { ok: false, msg: "Марку определить не удалось. Заполните вручную." };
+  }
+
   async function decodeVin() {
     const v = vin.trim().toUpperCase();
     if (v.length < 3) {
@@ -128,63 +194,51 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         setVinResult({ ok: false, msg: data.error || "Не удалось распознать номер" });
         return;
       }
-      // Сопоставляем бренд с нашей базой (регистронезависимо)
-      const matchedBrand = data.brand
-        ? CAR_BRANDS.find((b) => b.toLowerCase() === data.brand.toLowerCase())
-        : "";
-      const parts: string[] = [];
-      if (matchedBrand) {
-        selectBrand(matchedBrand);
-        parts.push(matchedBrand);
-      } else if (data.brand) {
-        parts.push(`${data.brand} (нет в списке)`);
-      }
-      // Модель (из японского кода кузова). Ставим после selectBrand — он очищает модель.
-      let matchedModel = "";
-      if (data.model && matchedBrand) {
-        const models = CAR_MODELS[matchedBrand] ?? [];
-        matchedModel = models.find((m) => m.toLowerCase() === data.model.toLowerCase()) || data.model;
-        setModel(matchedModel);
-        setModelSuggestions([]);
-        setShowModelDropdown(false);
-        parts.push(matchedModel);
-      }
-      const matchedYear = data.year || "";
-      if (matchedYear) {
-        setYear(matchedYear);
-        parts.push(matchedYear);
-      }
-      if (data.country && !data.model) parts.push(data.country);
-
-      // Подбираем поколение (кузов) по году и сразу грузим двигатели
-      let matchedGen: Generation | null = null;
-      if (matchedBrand && matchedModel && matchedYear) {
-        matchedGen = findGenerationByYear(matchedBrand, matchedModel, matchedYear);
-        if (matchedGen) {
-          setGeneration(matchedGen);
-          parts.push(`кузов ${matchedGen.name}`);
-        }
-      }
-
-      if (parts.length && (matchedBrand || matchedYear)) {
-        const canAutoEngines = matchedBrand && matchedModel && matchedYear.length === 4;
-        const needModel = matchedBrand && !matchedModel;
-        setVinResult({
-          ok: true,
-          msg: `Определено: ${parts.join(", ")}.`
-            + (needModel ? " Укажите модель вручную." : "")
-            + (canAutoEngines ? " Подбираю двигатели..." : ""),
-        });
-        if (canAutoEngines) {
-          handleFetchEngines({ brand: matchedBrand, model: matchedModel, year: matchedYear, generation: matchedGen });
-        }
-      } else {
-        setVinResult({ ok: false, msg: "Марку определить не удалось. Заполните вручную." });
-      }
+      setVinResult(applyRecognized(data));
     } catch {
       setVinResult({ ok: false, msg: "Ошибка сети. Попробуйте позже." });
     } finally {
       setVinLoading(false);
+    }
+  }
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleStsPhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 12 * 1024 * 1024) {
+      setVinResult({ ok: false, msg: "Фото слишком большое (макс. 12 МБ)" });
+      return;
+    }
+    setStsLoading(true);
+    setVinResult({ ok: true, msg: "Распознаю данные со СТС..." });
+    try {
+      const b64 = await fileToBase64(file);
+      const res = await fetch(CAR_SPECS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "sts_photo", image: b64 }),
+      });
+      const data = await res.json();
+      if (!data.valid) {
+        setVinResult({ ok: false, msg: data.error || "Не удалось распознать СТС" });
+        return;
+      }
+      if (data.vin && String(data.vin).length === 17) setVin(String(data.vin).toUpperCase());
+      setVinResult(applyRecognized(data));
+    } catch {
+      setVinResult({ ok: false, msg: "Ошибка сети. Попробуйте ещё раз." });
+    } finally {
+      setStsLoading(false);
     }
   }
 
@@ -367,6 +421,43 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         </div>
 
         <div className="space-y-3">
+          {/* Распознавание по фото СТС */}
+          <div>
+            <input ref={stsCameraRef} type="file" accept="image/*" capture="environment" onChange={handleStsPhoto} className="hidden" />
+            <input ref={stsGalleryRef} type="file" accept="image/*" onChange={handleStsPhoto} className="hidden" />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => stsCameraRef.current?.click()}
+                disabled={stsLoading}
+                className="flex-1 py-3 rounded-xl bg-foreground text-background text-sm font-golos font-semibold disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                {stsLoading
+                  ? <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                  : <Icon name="Camera" size={16} />}
+                Сфотографировать СТС
+              </button>
+              <button
+                type="button"
+                onClick={() => stsGalleryRef.current?.click()}
+                disabled={stsLoading}
+                className="shrink-0 px-4 rounded-xl bg-secondary text-foreground border border-border disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center"
+                title="Выбрать из галереи"
+              >
+                <Icon name="Image" size={16} />
+              </button>
+            </div>
+            <p className="text-xs font-golos text-muted-foreground mt-1.5 text-center">
+              Сфоткай свидетельство — данные заполнятся сами
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-border flex-1" />
+            <span className="text-xs font-golos text-muted-foreground">или по номеру</span>
+            <div className="h-px bg-border flex-1" />
+          </div>
+
           {/* VIN (опционально) */}
           <div>
             <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5 block">

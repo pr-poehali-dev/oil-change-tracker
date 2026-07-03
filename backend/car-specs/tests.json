@@ -54,6 +54,13 @@
       "path": "/",
       "body": { "mode": "vin", "vin": "ER34" },
       "expectedStatus": 200
+    },
+    {
+      "name": "СТС без фото — ошибка",
+      "method": "POST",
+      "path": "/",
+      "body": { "mode": "sts_photo", "image": "" },
+      "expectedStatus": 400
     }
   ]
 }
