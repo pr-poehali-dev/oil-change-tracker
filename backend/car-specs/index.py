@@ -1118,77 +1118,100 @@ def _call_ai(api_key: str, prompt: str, max_tokens: int = 1200, use_openai: bool
         return _fallback(prompt)
 
 
+def _yandex_ocr(image_b64: str, api_key: str, folder_id: str) -> str:
+    """Распознаёт весь текст с фото через Yandex Vision OCR. Возвращает текст."""
+    payload = json.dumps({
+        'mimeType': 'JPEG',
+        'languageCodes': ['ru', 'en'],
+        'model': 'page',
+        'content': image_b64,
+    }).encode('utf-8')
+    r = urllib.request.Request(
+        'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText',
+        data=payload,
+        headers={
+            'Authorization': f'Api-Key {api_key}',
+            'x-folder-id': folder_id,
+            'x-data-logging-enabled': 'true',
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+    with urllib.request.urlopen(r, timeout=40) as resp:
+        raw = resp.read().decode('utf-8').strip()
+
+    # Ответ может быть обычным JSON или JSON Lines (несколько объектов)
+    def _extract(obj):
+        result = obj.get('result') or obj
+        annotation = result.get('textAnnotation') or {}
+        return annotation.get('fullText', '') or ''
+
+    try:
+        return _extract(json.loads(raw))
+    except json.JSONDecodeError:
+        texts = []
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                texts.append(_extract(json.loads(line)))
+            except json.JSONDecodeError:
+                continue
+        return '\n'.join(t for t in texts if t)
+
+
 def _recognize_sts_photo(image_b64: str) -> dict:
-    """Распознаёт данные авто по фото СТС через OpenAI Vision.
+    """Распознаёт данные авто по фото СТС: Yandex OCR -> YandexGPT.
 
     Возвращает {brand, model, year, vin, volume, power, valid, error}.
     """
-    api_key = os.environ.get('OPENAI_API_KEY', '')
-    if not api_key:
+    api_key = os.environ.get('YANDEX_API_KEY', '')
+    folder_id = os.environ.get('YANDEX_FOLDER_ID', '')
+    if not api_key or not folder_id:
         return {'valid': False, 'error': 'Распознавание временно недоступно', 'brand': '', 'model': '', 'year': '', 'vin': ''}
 
     # Отсекаем префикс data:image/...;base64, если он есть
     if ',' in image_b64 and image_b64.strip().startswith('data:'):
         image_b64 = image_b64.split(',', 1)[1]
 
-    prompt_text = (
-        "На фото — российское свидетельство о регистрации ТС (СТС) или ПТС. "
-        "Распознай данные автомобиля и верни СТРОГО валидный JSON без markdown:\n"
-        '{"brand":"марка латиницей (Toyota, BMW...)","model":"модель","year":"год выпуска 4 цифры",'
-        '"vin":"VIN 17 символов","volume":"объём двигателя в литрах, напр 2.0","power":"мощность в л.с., только число"}\n'
-        "Правила: марку пиши латиницей в общепринятом виде. Если поле не читается — оставь пустую строку. "
-        "Объём переведи из см³ в литры (1998 см³ -> 2.0). Мощность бери в л.с. (не кВт). "
-        "Только JSON, ничего лишнего."
-    )
-
-    payload = json.dumps({
-        'model': 'gpt-4o-mini',
-        'max_tokens': 400,
-        'temperature': 0,
-        'messages': [
-            {
-                'role': 'user',
-                'content': [
-                    {'type': 'text', 'text': prompt_text},
-                    {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{image_b64}'}},
-                ],
-            },
-        ],
-    }).encode('utf-8')
-
+    # Шаг 1 — распознаём текст с фото
     try:
-        r = urllib.request.Request(
-            'https://api.openai.com/v1/chat/completions',
-            data=payload,
-            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-            method='POST',
-        )
-        with urllib.request.urlopen(r, timeout=40) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-        content = data['choices'][0]['message']['content'].strip()
-        if content.startswith('```'):
-            lines = content.split('\n')
-            content = '\n'.join(lines[1:])
-            if '```' in content:
-                content = content[:content.rfind('```')].strip()
-        parsed = json.loads(content)
-        result = {
-            'valid': True,
-            'error': '',
-            'brand': str(parsed.get('brand') or '').strip(),
-            'model': str(parsed.get('model') or '').strip(),
-            'year': str(parsed.get('year') or '').strip(),
-            'vin': str(parsed.get('vin') or '').strip().upper(),
-            'volume': str(parsed.get('volume') or '').strip(),
-            'power': str(parsed.get('power') or '').strip(),
-        }
-        if not (result['brand'] or result['vin']):
-            result['valid'] = False
-            result['error'] = 'Не удалось распознать данные. Сфотографируйте СТС чётче.'
-        return result
+        ocr_text = _yandex_ocr(image_b64, api_key, folder_id)
     except Exception as e:
-        print(f"STS recognize failed: {e}")
-        return {'valid': False, 'error': 'Не удалось распознать фото. Попробуйте ещё раз.', 'brand': '', 'model': '', 'year': '', 'vin': ''}
+        print(f"STS OCR failed: {e}")
+        return {'valid': False, 'error': 'Не удалось прочитать фото. Сфотографируйте чётче.', 'brand': '', 'model': '', 'year': '', 'vin': ''}
+
+    print(f"STS OCR text ({len(ocr_text)} chars): {ocr_text[:300]}")
+    if not ocr_text or len(ocr_text) < 10:
+        return {'valid': False, 'error': 'Текст на фото не распознан. Сфотографируйте СТС чётче.', 'brand': '', 'model': '', 'year': '', 'vin': ''}
+
+    # Шаг 2 — из текста извлекаем данные авто через YandexGPT
+    prompt = (
+        "Это распознанный текст с российского СТС или ПТС. Извлеки данные автомобиля.\n\n"
+        f"ТЕКСТ:\n{ocr_text[:4000]}\n\n"
+        "Верни СТРОГО валидный JSON без markdown:\n"
+        '{"brand":"марка латиницей (Toyota, BMW, Lada...)","model":"модель","year":"год выпуска 4 цифры",'
+        '"vin":"VIN 17 символов","volume":"объём двигателя в литрах, напр 2.0","power":"мощность в л.с., только число"}\n'
+        "Правила: марку латиницей в общепринятом виде. Объём переведи из см³ в литры (1998 см³ -> 2.0). "
+        "Мощность в л.с. (не кВт). Если поле не найдено — пустая строка. Только JSON."
+    )
+    ai = _call_ai(api_key, prompt, max_tokens=400, use_openai=False)
+
+    result = {
+        'valid': True,
+        'error': '',
+        'brand': str(ai.get('brand') or '').strip(),
+        'model': str(ai.get('model') or '').strip(),
+        'year': str(ai.get('year') or '').strip(),
+        'vin': str(ai.get('vin') or '').strip().upper(),
+        'volume': str(ai.get('volume') or '').strip(),
+        'power': str(ai.get('power') or '').strip(),
+    }
+    if not (result['brand'] or result['vin']):
+        result['valid'] = False
+        result['error'] = 'Не удалось распознать данные. Сфотографируйте СТС чётче.'
+    return result
 
 
 def _fallback(prompt: str) -> dict:
