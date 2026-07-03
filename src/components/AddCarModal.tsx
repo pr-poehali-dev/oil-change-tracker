@@ -202,11 +202,32 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     }
   }
 
-  function fileToBase64(file: File): Promise<string> {
+  // Сжимаем фото перед отправкой: уменьшаем размер и качество,
+  // чтобы не упереться в лимит размера запроса и ускорить распознавание.
+  function compressImage(file: File, maxSide = 1600, quality = 0.7): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
+      reader.onerror = () => reject(new Error("read error"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("image error"));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxSide || height > maxSide) {
+            const scale = maxSide / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { reject(new Error("no ctx")); return; }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = String(reader.result);
+      };
       reader.readAsDataURL(file);
     });
   }
@@ -215,19 +236,20 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > 12 * 1024 * 1024) {
-      setVinResult({ ok: false, msg: "Фото слишком большое (макс. 12 МБ)" });
-      return;
-    }
     setStsLoading(true);
     setVinResult({ ok: true, msg: "Распознаю данные со СТС..." });
     try {
-      const b64 = await fileToBase64(file);
+      const b64 = await compressImage(file);
       const res = await fetch(CAR_SPECS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "sts_photo", image: b64 }),
       });
+      if (!res.ok) {
+        console.error("STS photo HTTP error", res.status);
+        setVinResult({ ok: false, msg: "Сервер не ответил. Попробуйте ещё раз." });
+        return;
+      }
       const data = await res.json();
       if (!data.valid) {
         setVinResult({ ok: false, msg: data.error || "Не удалось распознать СТС" });
@@ -235,7 +257,8 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       }
       if (data.vin && String(data.vin).length === 17) setVin(String(data.vin).toUpperCase());
       setVinResult(applyRecognized(data));
-    } catch {
+    } catch (err) {
+      console.error("STS photo error", err);
       setVinResult({ ok: false, msg: "Ошибка сети. Попробуйте ещё раз." });
     } finally {
       setStsLoading(false);
