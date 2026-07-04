@@ -347,29 +347,37 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setDbCarId(null);
   }
 
-  // Выбирает двигатель из списка, наиболее близкий по объёму и мощности (данные со СТС)
-  function pickBestEngine(list: Engine[], hintVolume?: string, hintPower?: string): Engine | null {
+  // По данным со СТС берёт двигатель ТОЧНО из СТС.
+  // Если такой уже есть в списке — использует его, иначе создаёт новый
+  // двигатель прямо из СТС и добавляет его в список.
+  // Возвращает { engine, list } — двигатель для выбора и обновлённый список.
+  function buildEngineFromSts(list: Engine[], hintVolume?: string, hintPower?: string): { engine: Engine | null; list: Engine[] } {
     const v = parseFloat((hintVolume || "").replace(",", "."));
     const p = parseInt((hintPower || "").replace(/\D/g, ""), 10);
-    if (!list.length || (!v && !p)) return null;
-    let best: Engine | null = null;
-    let bestScore = Infinity;
-    for (const e of list) {
+    if (!v && !p) return { engine: null, list };
+
+    // Ищем точное совпадение по объёму и мощности
+    const exact = list.find((e) => {
       const ev = parseFloat((e.volume || "").replace(",", "."));
       const ep = parseInt((e.power || "").replace(/\D/g, ""), 10);
-      let score = 0;
-      if (v && ev) score += Math.abs(ev - v) * 100;
-      else if (v) score += 50;
-      if (p && ep) score += Math.abs(ep - p);
-      else if (p) score += 30;
-      if (score < bestScore) { bestScore = score; best = e; }
-    }
-    // Отсекаем совсем непохожие: объём не должен отличаться больше чем на 0.3 л
-    if (best && v) {
-      const bv = parseFloat((best.volume || "").replace(",", "."));
-      if (bv && Math.abs(bv - v) > 0.3) return null;
-    }
-    return best;
+      const volOk = v ? Math.abs(ev - v) < 0.05 : true;
+      const powOk = p ? ep === p : true;
+      return volOk && powOk;
+    });
+    if (exact) return { engine: exact, list };
+
+    // Точного нет — создаём двигатель прямо из СТС
+    const volStr = v ? v.toFixed(1) : "";
+    const parts = [volStr ? `${volStr} л` : "", p ? `${p} л.с.` : ""].filter(Boolean);
+    const name = parts.length ? `${parts.join(", ")} (из СТС)` : "Двигатель из СТС";
+    const stsEngine: Engine = {
+      id: `sts_${Date.now()}`,
+      name,
+      volume: volStr,
+      power: p ? String(p) : "",
+      fuel: "бензин",
+    };
+    return { engine: stsEngine, list: [stsEngine, ...list] };
   }
 
   async function handleFetchEngines(override?: { brand?: string; model?: string; year?: string; generation?: Generation | null; hintVolume?: string; hintPower?: string }) {
@@ -395,13 +403,20 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка сервера");
-      const list: Engine[] = data.engines || [];
+      let list: Engine[] = data.engines || [];
+      // Если пришли данные со СТС — берём двигатель точно из СТС
+      const hasStsHint = !!(override?.hintVolume || override?.hintPower);
+      let stsEngine: Engine | null = null;
+      if (hasStsHint) {
+        const built = buildEngineFromSts(list, override?.hintVolume, override?.hintPower);
+        list = built.list;
+        stsEngine = built.engine;
+      }
       setEngines(list);
       setEnginesLoaded(true);
-      const best = pickBestEngine(list, override?.hintVolume, override?.hintPower);
-      if (best) {
-        setSelectedEngine(best);
-        handleFetchSpecs(best);
+      if (stsEngine) {
+        setSelectedEngine(stsEngine);
+        handleFetchSpecs(stsEngine);
       }
     } catch (e: unknown) {
       setEnginesError(e instanceof Error ? e.message : "Не удалось получить данные");
