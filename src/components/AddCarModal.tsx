@@ -351,10 +351,10 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   // Если такой уже есть в списке — использует его, иначе создаёт новый
   // двигатель прямо из СТС и добавляет его в список.
   // Возвращает { engine, list } — двигатель для выбора и обновлённый список.
-  function buildEngineFromSts(list: Engine[], hintVolume?: string, hintPower?: string): { engine: Engine | null; list: Engine[] } {
+  function buildEngineFromSts(list: Engine[], hintVolume?: string, hintPower?: string): { engine: Engine | null; list: Engine[]; isNew: boolean } {
     const v = parseFloat((hintVolume || "").replace(",", "."));
     const p = parseInt((hintPower || "").replace(/\D/g, ""), 10);
-    if (!v && !p) return { engine: null, list };
+    if (!v && !p) return { engine: null, list, isNew: false };
 
     // Ищем точное совпадение по объёму и мощности
     const exact = list.find((e) => {
@@ -364,7 +364,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       const powOk = p ? ep === p : true;
       return volOk && powOk;
     });
-    if (exact) return { engine: exact, list };
+    if (exact) return { engine: exact, list, isNew: false };
 
     // Точного нет — создаём двигатель прямо из СТС
     const volStr = v ? v.toFixed(1) : "";
@@ -377,7 +377,24 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       power: p ? String(p) : "",
       fuel: "бензин",
     };
-    return { engine: stsEngine, list: [stsEngine, ...list] };
+    return { engine: stsEngine, list: [stsEngine, ...list], isNew: true };
+  }
+
+  // Сохраняет двигатель из СТС в общую базу, чтобы использовать его в будущем
+  async function saveStsEngineToDb(b: string, m: string, genName: string | undefined, engine: Engine) {
+    try {
+      await fetch(CAR_SPECS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "save_engine",
+          brand: b, model: m, generation: genName || "",
+          name: engine.name, volume: engine.volume, power: engine.power, fuel: engine.fuel,
+        }),
+      });
+    } catch {
+      // сохранение в фоне — молча игнорируем ошибку
+    }
   }
 
   async function handleFetchEngines(override?: { brand?: string; model?: string; year?: string; generation?: Generation | null; hintVolume?: string; hintPower?: string }) {
@@ -411,6 +428,10 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         const built = buildEngineFromSts(list, override?.hintVolume, override?.hintPower);
         list = built.list;
         stsEngine = built.engine;
+        // Новый двигатель из СТС — сохраняем в общую базу для будущего использования
+        if (built.isNew && stsEngine) {
+          saveStsEngineToDb(b, m, genName, stsEngine);
+        }
       }
       setEngines(list);
       setEnginesLoaded(true);

@@ -55,6 +55,18 @@ def handler(event: dict, context) -> dict:
         print(f"Car image: {brand} {model} {generation} {year} -> {image_url[:80] if image_url else 'none'}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'image': image_url}, ensure_ascii=False)}
 
+    if mode == 'save_engine':
+        gen = body.get('generation', '').strip()
+        saved = _save_custom_engine(
+            brand, model, gen,
+            body.get('name', '').strip(),
+            body.get('volume', '').strip(),
+            body.get('power', '').strip(),
+            body.get('fuel', 'бензин').strip(),
+        )
+        print(f"Save custom engine: {brand} {model} {gen} -> {saved}")
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'ok': saved}, ensure_ascii=False)}
+
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
@@ -68,13 +80,15 @@ def handler(event: dict, context) -> dict:
     transmission = body.get('transmission', '').strip().lower()
 
     if mode == 'engines':
+        custom = _find_custom_engines(brand, model, generation)
+
         local = _find_local_engines(brand, model, generation, year)
         if local:
             print(f"Local DB hit: {brand} {model} {generation} {year} -> {len(local)} engines")
-            return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': local}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': _merge_engines(local, custom)}, ensure_ascii=False)}
 
         if not api_key:
-            return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': []}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'engines': custom}, ensure_ascii=False)}
 
         wiki_text = _fetch_wiki_text(brand, model, generation)
         print(f"Wiki text length: {len(wiki_text)}")
@@ -98,8 +112,8 @@ JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","vol
         result = _call_ai(api_key, prompt, max_tokens=1500, use_openai=use_openai)
         engines = result.get('engines', [])
         engines = _validate_engines(engines)
-        if engines:
-            result['engines'] = engines
+        # Подмешиваем сохранённые пользователем двигатели (из СТС)
+        result['engines'] = _merge_engines(engines, custom)
         print(f"AI engines result: {str(result)[:200]}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
@@ -746,6 +760,71 @@ def _find_gen_by_year(brand: str, model: str, year: int) -> str:
         if y_start <= year <= y_end:
             return gen_name
     return ''
+
+
+def _find_custom_engines(brand: str, model: str, generation: str = '') -> list:
+    """Читает сохранённые пользователем двигатели (например из СТС) для марки/модели."""
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"""SELECT id, name, volume, power, fuel FROM {SCHEMA}.custom_engines
+                WHERE LOWER(brand) = LOWER(%s) AND LOWER(model) = LOWER(%s)
+                ORDER BY created_at DESC""",
+            (brand.strip(), model.strip()),
+        )
+        rows = cur.fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"Custom engines read error: {e}")
+        return []
+
+    result = []
+    for row in rows:
+        result.append({
+            'id': f"custom_{row[0]}",
+            'name': row[1],
+            'volume': row[2] or '',
+            'power': row[3] or '',
+            'fuel': row[4] or 'бензин',
+        })
+    return result
+
+
+def _save_custom_engine(brand: str, model: str, generation: str,
+                        name: str, volume: str, power: str, fuel: str) -> bool:
+    """Сохраняет двигатель (из СТС) в базу, чтобы использовать его позже."""
+    if not brand or not model or not name:
+        return False
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.custom_engines (brand, model, generation, name, volume, power, fuel)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (brand, model, generation, volume, power) DO NOTHING""",
+            (brand.strip(), model.strip(), generation.strip(),
+             name.strip(), volume.strip(), power.strip(), (fuel or 'бензин').strip()),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Custom engine save error: {e}")
+        return False
+
+
+def _merge_engines(primary: list, extra: list) -> list:
+    """Объединяет списки двигателей, убирая дубли по объёму+мощности."""
+    seen = set()
+    merged = []
+    for e in extra + primary:
+        key = f"{(e.get('volume') or '').strip()}|{(e.get('power') or '').strip()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(e)
+    return merged
 
 
 def _find_local_engines(brand: str, model: str, generation: str = '', year: str = '') -> list:

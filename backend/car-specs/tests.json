@@ -68,6 +68,13 @@
       "path": "/",
       "body": { "mode": "car_image", "brand": "Toyota", "model": "Camry", "year": "2015" },
       "expectedStatus": 200
+    },
+    {
+      "name": "Сохранить двигатель из СТС",
+      "method": "POST",
+      "path": "/",
+      "body": { "mode": "save_engine", "brand": "TestBrand", "model": "TestModel", "generation": "", "name": "2.0 л, 150 л.с. (из СТС)", "volume": "2.0", "power": "150", "fuel": "бензин" },
+      "expectedStatus": 200
     }
   ]
 }
