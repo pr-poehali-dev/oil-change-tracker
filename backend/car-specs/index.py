@@ -885,15 +885,60 @@ def _wiki_api(lang: str, params: dict) -> dict:
         return json.loads(resp.read().decode('utf-8'))
 
 
+def _commons_api(params: dict) -> dict:
+    base = "https://commons.wikimedia.org/w/api.php"
+    params['format'] = 'json'
+    qs = urllib.parse.urlencode(params)
+    req = urllib.request.Request(f"{base}?{qs}", headers={'User-Agent': 'CarSpecsBot/1.0'})
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        return json.loads(resp.read().decode('utf-8'))
+
+
+def _commons_search_image(query: str) -> str:
+    """Ищет конкретное фото на Wikimedia Commons (там фото рассортированы по поколениям/кузовам)."""
+    try:
+        search = _commons_api({'action': 'query', 'list': 'search',
+                                'srsearch': f"{query} filetype:bitmap",
+                                'srnamespace': '6', 'srlimit': '5'})
+        hits = search.get('query', {}).get('search', [])
+        for hit in hits:
+            title = hit.get('title', '')
+            if not title.startswith('File:'):
+                continue
+            info = _commons_api({'action': 'query', 'titles': title,
+                                  'prop': 'imageinfo', 'iiprop': 'url', 'iiurlwidth': '800'})
+            pages = info.get('query', {}).get('pages', {})
+            for p in pages.values():
+                ii = p.get('imageinfo')
+                if ii:
+                    url = ii[0].get('thumburl') or ii[0].get('url')
+                    if url:
+                        return url
+    except Exception as e:
+        print(f"Commons search failed {query}: {e}")
+    return ''
+
+
 def _find_car_image(brand: str, model: str, generation: str = '', year: str = '') -> str:
-    """Ищет фото авто через Wikipedia (главное изображение страницы)."""
+    """Ищет фото конкретного поколения авто: сначала Wikimedia Commons (точнее по кузовам),
+    затем главное изображение страницы Wikipedia как запасной вариант."""
     b = brand.strip()
     m = model.strip()
     g = re.sub(r'\s*(поколение|рестайлинг|series)\s*', '', generation, flags=re.IGNORECASE).strip()
 
+    # Сначала пробуем найти фото именно этого поколения через Commons
+    if g:
+        commons_queries = [f"{b} {m} {g}", f"{b} {g}"]
+        for q in commons_queries:
+            img = _commons_search_image(q)
+            if img:
+                return img
+
     queries = []
     if g:
         queries.append(f"{b} {m} {g}")
+    if year:
+        queries.append(f"{b} {m} {year}")
     queries.append(f"{b} {m}")
 
     for lang in ['en', 'ru']:
@@ -913,7 +958,10 @@ def _find_car_image(brand: str, model: str, generation: str = '', year: str = ''
             except Exception as e:
                 print(f"Car image search failed {lang} {q}: {e}")
                 continue
-    return ''
+
+    # Совсем ничего не нашли под конкретную модель — пробуем общий поиск фото на Commons
+    img = _commons_search_image(f"{b} {m}")
+    return img
 
 
 def _wiki_page_image(lang: str, title: str) -> str:

@@ -604,6 +604,34 @@ export const CAR_GENERATIONS: Record<string, Record<string, Generation[]>> = {
       { name: "R34", years: "1999–2002" },
       { name: "R35", years: "2007–н.в." },
     ],
+    "Skyline": [
+      { name: "C10", years: "1968–1972" },
+      { name: "C110", years: "1972–1977" },
+      { name: "C210", years: "1977–1981" },
+      { name: "R30", years: "1981–1985" },
+      { name: "R31", years: "1985–1989" },
+      { name: "R32", years: "1989–1994" },
+      { name: "R33", years: "1993–1998" },
+      { name: "R34", years: "1998–2002" },
+      { name: "V35", years: "2001–2007" },
+      { name: "V36", years: "2006–2014" },
+      { name: "V37", years: "2013–н.в." },
+    ],
+    "Cefiro": [
+      { name: "A31", years: "1988–1994" },
+      { name: "A32", years: "1994–1998" },
+      { name: "A33", years: "1998–2003" },
+    ],
+    "Laurel": [
+      { name: "C33", years: "1989–1993" },
+      { name: "C34", years: "1993–1997" },
+      { name: "C35", years: "1997–2002" },
+    ],
+    "Silvia": [
+      { name: "S13", years: "1988–1993" },
+      { name: "S14", years: "1993–1999" },
+      { name: "S15", years: "1999–2002" },
+    ],
   },
   "Mazda": {
     "2": [

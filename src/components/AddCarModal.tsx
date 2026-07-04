@@ -325,6 +325,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
 
   function selectGeneration(g: Generation) {
     setGeneration(g);
+    setCarImage("");
     const startYear = g.years.split("–")[0].trim();
     if (startYear && startYear !== "н.в." && startYear.length === 4) {
       setYear(startYear);
