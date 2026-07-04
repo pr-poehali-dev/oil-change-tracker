@@ -69,6 +69,13 @@
       "headers": {"X-User-Id": "test-user-uuid-123"},
       "body": {"action": "save_subscription", "subscription": {}},
       "expectedStatus": 400
+    },
+    {
+      "name": "Рассылка без токена — запрещено",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "check_and_send", "secret": "wrong"},
+      "expectedStatus": 403
     }
   ]
 }

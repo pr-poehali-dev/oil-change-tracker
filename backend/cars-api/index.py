@@ -143,6 +143,10 @@ def handle_push_action(action, body, user_id):
         return resp(200, {'ok': True, 'sent': sent, 'total': len(rows)})
 
     if action == 'check_and_send':
+        expected = os.environ.get('CRON_SECRET', '')
+        provided = body.get('secret', '')
+        if not expected or provided != expected:
+            return resp(403, {'ok': False, 'error': 'forbidden'})
         return _check_and_send()
 
     return None
