@@ -116,7 +116,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   // Общая логика: заполняет форму по распознанным данным (VIN / код кузова / СТС)
   // и запускает подбор двигателей. Возвращает {ok, msg} для показа пользователю.
   function applyRecognized(data: {
-    brand?: string; model?: string; year?: string; country?: string;
+    brand?: string; model?: string; year?: string; country?: string; volume?: string; power?: string;
   }): { ok: boolean; msg: string } {
     const matchedBrand = data.brand
       ? CAR_BRANDS.find((b) => b.toLowerCase() === data.brand!.toLowerCase())
@@ -163,7 +163,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       const canAutoEngines = !!(matchedBrand && matchedModel && matchedYear.length === 4);
       const needModel = matchedBrand && !matchedModel;
       if (canAutoEngines) {
-        handleFetchEngines({ brand: matchedBrand as string, model: matchedModel, year: matchedYear, generation: matchedGen });
+        handleFetchEngines({ brand: matchedBrand as string, model: matchedModel, year: matchedYear, generation: matchedGen, hintVolume: data.volume, hintPower: data.power });
       }
       return {
         ok: true,
@@ -314,7 +314,32 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     setDbCarId(null);
   }
 
-  async function handleFetchEngines(override?: { brand?: string; model?: string; year?: string; generation?: Generation | null }) {
+  // Выбирает двигатель из списка, наиболее близкий по объёму и мощности (данные со СТС)
+  function pickBestEngine(list: Engine[], hintVolume?: string, hintPower?: string): Engine | null {
+    const v = parseFloat((hintVolume || "").replace(",", "."));
+    const p = parseInt((hintPower || "").replace(/\D/g, ""), 10);
+    if (!list.length || (!v && !p)) return null;
+    let best: Engine | null = null;
+    let bestScore = Infinity;
+    for (const e of list) {
+      const ev = parseFloat((e.volume || "").replace(",", "."));
+      const ep = parseInt((e.power || "").replace(/\D/g, ""), 10);
+      let score = 0;
+      if (v && ev) score += Math.abs(ev - v) * 100;
+      else if (v) score += 50;
+      if (p && ep) score += Math.abs(ep - p);
+      else if (p) score += 30;
+      if (score < bestScore) { bestScore = score; best = e; }
+    }
+    // Отсекаем совсем непохожие: объём не должен отличаться больше чем на 0.3 л
+    if (best && v) {
+      const bv = parseFloat((best.volume || "").replace(",", "."));
+      if (bv && Math.abs(bv - v) > 0.3) return null;
+    }
+    return best;
+  }
+
+  async function handleFetchEngines(override?: { brand?: string; model?: string; year?: string; generation?: Generation | null; hintVolume?: string; hintPower?: string }) {
     setEnginesLoading(true);
     setEnginesError("");
     setEnginesLoaded(false);
@@ -337,8 +362,14 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка сервера");
-      setEngines(data.engines || []);
+      const list: Engine[] = data.engines || [];
+      setEngines(list);
       setEnginesLoaded(true);
+      const best = pickBestEngine(list, override?.hintVolume, override?.hintPower);
+      if (best) {
+        setSelectedEngine(best);
+        handleFetchSpecs(best);
+      }
     } catch (e: unknown) {
       setEnginesError(e instanceof Error ? e.message : "Не удалось получить данные");
     } finally {
