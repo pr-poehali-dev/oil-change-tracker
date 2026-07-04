@@ -71,6 +71,14 @@ export const apiSaveReset = (carId: string, intervalId: string, lastDate: string
   carsPost({ action: "save_reset", carId, intervalId, lastDate, lastKm });
 export const apiMigrateUser = (oldUserId: string) => carsPost({ action: "migrate_user", oldUserId });
 
+// Web Push
+export const apiGetVapidKey = () => carsPost({ action: "vapid_public_key" });
+export const apiSavePushSubscription = (subscription: PushSubscriptionJSON) =>
+  carsPost({ action: "save_subscription", subscription });
+export const apiRemovePushSubscription = (endpoint: string) =>
+  carsPost({ action: "remove_subscription", endpoint });
+export const apiTestPush = () => carsPost({ action: "test_push" });
+
 // Documents
 export const apiGetDocuments = (params?: { type?: string }) => {
   const qs = new URLSearchParams();

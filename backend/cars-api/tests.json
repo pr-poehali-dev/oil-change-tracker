@@ -45,6 +45,30 @@
       "expectedStatus": 200,
       "expectedBody": {"ok": true},
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Генерация VAPID-ключей",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "generate_vapid"},
+      "expectedStatus": 200,
+      "expectedBody": {"publicKey": "string", "privateKey": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Публичный VAPID-ключ",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "vapid_public_key"},
+      "expectedStatus": 200
+    },
+    {
+      "name": "Подписка без данных — ошибка",
+      "method": "POST",
+      "path": "/",
+      "headers": {"X-User-Id": "test-user-uuid-123"},
+      "body": {"action": "save_subscription", "subscription": {}},
+      "expectedStatus": 400
     }
   ]
 }

@@ -10,7 +10,8 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import LoginPage from "./pages/Login";
 import { AuthContext, AuthUser } from "./lib/auth";
-import { registerServiceWorker, requestWebNotifPermission } from "./lib/notifications";
+import { registerServiceWorker, subscribeToPush } from "./lib/notifications";
+import { apiGetVapidKey, apiSavePushSubscription } from "./api";
 
 const AUTH_URL = "https://functions.poehali.dev/942caddf-e666-440d-9d89-682d8a35bae3";
 
@@ -118,11 +119,12 @@ const App = () => {
 
   useEffect(() => {
     if (!user) return;
-    const asked = localStorage.getItem("web_notif_asked");
-    if (!asked) {
-      const t = setTimeout(() => requestWebNotifPermission(), 3000);
-      return () => clearTimeout(t);
-    }
+    // Через пару секунд после входа предлагаем/обновляем подписку на push,
+    // чтобы напоминания о замене масла приходили даже при закрытом приложении.
+    const t = setTimeout(() => {
+      subscribeToPush(apiGetVapidKey, apiSavePushSubscription).catch(() => {});
+    }, 3000);
+    return () => clearTimeout(t);
   }, [user]);
 
   function handleLogin(token: string, phone: string) {

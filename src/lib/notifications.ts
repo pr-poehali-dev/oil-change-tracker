@@ -179,3 +179,45 @@ export async function sendTestNotification(): Promise<boolean> {
   );
   return true;
 }
+
+// ─── Серверные Web Push уведомления ────────────────────────────────
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
+// Подписывает пользователя на серверные push-уведомления.
+// Возвращает true, если подписка успешно оформлена и сохранена.
+export async function subscribeToPush(
+  getVapidKey: () => Promise<{ publicKey: string }>,
+  saveSubscription: (sub: PushSubscriptionJSON) => Promise<unknown>,
+): Promise<boolean> {
+  if (isNative()) return false;
+  if (!isWebNotifSupported() || !('PushManager' in window)) return false;
+
+  const granted = await requestWebNotifPermission();
+  if (!granted) return false;
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const { publicKey } = await getVapidKey();
+      if (!publicKey) return false;
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+    await saveSubscription(sub.toJSON());
+    localStorage.setItem('push_subscribed', '1');
+    return true;
+  } catch (e) {
+    console.error('subscribeToPush error', e);
+    return false;
+  }
+}

@@ -2,7 +2,8 @@ import { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { AuthContext } from "@/lib/auth";
-import { requestWebNotifPermission, getWebNotifPermission, sendTestNotification } from "@/lib/notifications";
+import { getWebNotifPermission, subscribeToPush } from "@/lib/notifications";
+import { apiGetVapidKey, apiSavePushSubscription, apiTestPush } from "@/api";
 
 
 function getTheme(): "light" | "dark" {
@@ -26,17 +27,27 @@ export default function Settings() {
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(getWebNotifPermission());
   const [notifMsg, setNotifMsg] = useState("");
 
+  const [notifBusy, setNotifBusy] = useState(false);
+
   async function handleEnableNotif() {
-    const ok = await sendTestNotification();
+    setNotifBusy(true);
+    setNotifMsg("Подключаю уведомления...");
+    const ok = await subscribeToPush(apiGetVapidKey, apiSavePushSubscription);
     setNotifPerm(getWebNotifPermission());
     if (ok) {
-      setNotifMsg("Готово! Отправили тестовое уведомление.");
+      try {
+        await apiTestPush();
+        setNotifMsg("Готово! Отправили тестовое уведомление. Напомним о замене масла даже при закрытом приложении.");
+      } catch {
+        setNotifMsg("Уведомления включены.");
+      }
     } else if (getWebNotifPermission() === "denied") {
       setNotifMsg("Уведомления запрещены в браузере. Разрешите их в настройках сайта.");
     } else {
-      setNotifMsg("Ваш браузер не поддерживает уведомления.");
+      setNotifMsg("Не удалось включить. Ваш браузер может не поддерживать уведомления.");
     }
-    setTimeout(() => setNotifMsg(""), 4000);
+    setNotifBusy(false);
+    setTimeout(() => setNotifMsg(""), 6000);
   }
 
   useEffect(() => {
@@ -120,14 +131,16 @@ export default function Settings() {
             {notifPerm === "granted" ? (
               <button
                 onClick={handleEnableNotif}
-                className="px-3 py-2 rounded-xl bg-secondary text-foreground text-xs font-golos font-medium hover:bg-muted active:scale-95 transition-all"
+                disabled={notifBusy}
+                className="px-3 py-2 rounded-xl bg-secondary text-foreground text-xs font-golos font-medium hover:bg-muted active:scale-95 transition-all disabled:opacity-50"
               >
                 Проверить
               </button>
             ) : (
               <button
                 onClick={handleEnableNotif}
-                className="px-3 py-2 rounded-xl bg-foreground text-background text-xs font-golos font-semibold hover:opacity-85 active:scale-95 transition-all"
+                disabled={notifBusy}
+                className="px-3 py-2 rounded-xl bg-foreground text-background text-xs font-golos font-semibold hover:opacity-85 active:scale-95 transition-all disabled:opacity-50"
               >
                 Включить
               </button>
