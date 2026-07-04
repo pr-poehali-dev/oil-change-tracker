@@ -894,17 +894,58 @@ def _commons_api(params: dict) -> dict:
         return json.loads(resp.read().decode('utf-8'))
 
 
-def _commons_search_image(query: str) -> str:
-    """Ищет конкретное фото на Wikimedia Commons (там фото рассортированы по поколениям/кузовам)."""
+_TRANSLIT_MAP = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+}
+
+
+def _transliterate(text: str) -> str:
+    """Транслитерирует кириллицу в латиницу (Wikimedia Commons хранит файлы почти всегда на латинице)."""
+    result = []
+    for ch in text:
+        lower = ch.lower()
+        if lower in _TRANSLIT_MAP:
+            t = _TRANSLIT_MAP[lower]
+            result.append(t.capitalize() if ch.isupper() and t else t)
+        else:
+            result.append(ch)
+    return ''.join(result)
+
+
+def _has_cyrillic(text: str) -> bool:
+    return bool(re.search('[а-яА-Я]', text))
+
+
+def _significant_words(text: str) -> list:
+    """Ключевые слова названия модели (без общих слов вроде 'next', 'series')."""
+    stop = {'next', 'series', 'i', 'ii', 'iii', 'iv', 'v', 'nn'}
+    words = re.findall(r'[a-zA-Zа-яА-Я0-9]+', text.lower())
+    return [w for w in words if w not in stop and len(w) > 1]
+
+
+def _commons_search_image(query: str, must_contain: list = None) -> str:
+    """Ищет конкретное фото на Wikimedia Commons (там фото рассортированы по поколениям/кузовам).
+
+    must_contain — список слов, хотя бы одно из которых должно встречаться в названии
+    найденного файла (защита от случайных/непохожих фото).
+    """
     try:
         search = _commons_api({'action': 'query', 'list': 'search',
                                 'srsearch': f"{query} filetype:bitmap",
-                                'srnamespace': '6', 'srlimit': '5'})
+                                'srnamespace': '6', 'srlimit': '8'})
         hits = search.get('query', {}).get('search', [])
         for hit in hits:
             title = hit.get('title', '')
             if not title.startswith('File:'):
                 continue
+            if must_contain:
+                title_low = title.lower()
+                if not any(w in title_low for w in must_contain):
+                    continue
             info = _commons_api({'action': 'query', 'titles': title,
                                   'prop': 'imageinfo', 'iiprop': 'url', 'iiurlwidth': '800'})
             pages = info.get('query', {}).get('pages', {})
@@ -926,20 +967,37 @@ def _find_car_image(brand: str, model: str, generation: str = '', year: str = ''
     m = model.strip()
     g = re.sub(r'\s*(поколение|рестайлинг|series)\s*', '', generation, flags=re.IGNORECASE).strip()
 
+    # Для кириллических марок/моделей — используем транслитерацию, т.к. Commons
+    # хранит файлы почти всегда на латинице (иначе поиск не найдёт нужное фото).
+    b_q = _transliterate(b) if _has_cyrillic(b) else b
+    m_q = _transliterate(m) if _has_cyrillic(m) else m
+    g_q = _transliterate(g) if _has_cyrillic(g) else g
+
+    # Ключевые слова модели — хотя бы одно ДОЛЖНО быть в названии найденного файла,
+    # иначе принимать случайное непохожее фото нельзя.
+    keywords = _significant_words(f"{m_q} {g_q}") or _significant_words(m_q)
+
     # Сначала пробуем найти фото именно этого поколения через Commons
-    if g:
-        commons_queries = [f"{b} {m} {g}", f"{b} {g}"]
+    if g_q:
+        commons_queries = [f"{b_q} {m_q} {g_q}", f"{b_q} {g_q}"]
         for q in commons_queries:
-            img = _commons_search_image(q)
+            img = _commons_search_image(q, must_contain=keywords)
             if img:
                 return img
 
+    # Общее фото модели (без поколения) через Commons — тоже проверяем на совпадение
+    img = _commons_search_image(f"{b_q} {m_q}", must_contain=keywords)
+    if img:
+        return img
+
     queries = []
-    if g:
-        queries.append(f"{b} {m} {g}")
+    if g_q:
+        queries.append(f"{b_q} {m_q} {g_q}")
     if year:
-        queries.append(f"{b} {m} {year}")
-    queries.append(f"{b} {m}")
+        queries.append(f"{b_q} {m_q} {year}")
+    queries.append(f"{b_q} {m_q}")
+    if b_q != b or m_q != m:
+        queries.append(f"{b} {m}")
 
     for lang in ['en', 'ru']:
         for q in queries:
@@ -952,6 +1010,13 @@ def _find_car_image(brand: str, model: str, generation: str = '', year: str = ''
                     title = hit.get('title', '')
                     if not title:
                         continue
+                    # Заголовок статьи должен содержать марку или модель — иначе
+                    # это случайная непохожая статья (защита от неправильных фото)
+                    title_low = title.lower()
+                    brand_ok = not b_q or b_q.lower() in title_low
+                    model_ok = not keywords or any(w in title_low for w in keywords)
+                    if not (brand_ok or model_ok):
+                        continue
                     img = _wiki_page_image(lang, title)
                     if img:
                         return img
@@ -959,9 +1024,8 @@ def _find_car_image(brand: str, model: str, generation: str = '', year: str = ''
                 print(f"Car image search failed {lang} {q}: {e}")
                 continue
 
-    # Совсем ничего не нашли под конкретную модель — пробуем общий поиск фото на Commons
-    img = _commons_search_image(f"{b} {m}")
-    return img
+    # Ничего не нашли — лучше вернуть пусто, чем показать случайное непохожее фото
+    return ''
 
 
 def _wiki_page_image(lang: str, title: str) -> str:
