@@ -59,7 +59,40 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
   const [fromDb, setFromDb] = useState(false);
   const [dbCarId, setDbCarId] = useState<string | null>(null);
 
+  const [carImage, setCarImage] = useState("");
+  const [carImageLoading, setCarImageLoading] = useState(false);
+
   const generations = brand && model ? (CAR_GENERATIONS[brand]?.[model] ?? []) : [];
+
+  // Ищем фото авто, когда заполнены марка, модель и год (4 цифры)
+  useEffect(() => {
+    const b = brand.trim();
+    const m = model.trim();
+    const y = year.trim();
+    if (!b || !m || y.length !== 4) {
+      setCarImage("");
+      return;
+    }
+    let cancelled = false;
+    setCarImageLoading(true);
+    const genName = generation?.name;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(CAR_SPECS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "car_image", brand: b, model: m, year: y, ...(genName ? { generation: genName } : {}) }),
+        });
+        const data = await res.json();
+        if (!cancelled) setCarImage(data.image || "");
+      } catch {
+        if (!cancelled) setCarImage("");
+      } finally {
+        if (!cancelled) setCarImageLoading(false);
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [brand, model, year, generation]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -652,6 +685,24 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
               />
             </div>
           </div>
+
+          {/* Фото автомобиля */}
+          {(carImageLoading || carImage) && (
+            <div className="rounded-xl overflow-hidden border border-border bg-secondary">
+              {carImageLoading ? (
+                <div className="w-full h-40 flex items-center justify-center">
+                  <Icon name="Loader" size={20} className="animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <img
+                  src={carImage}
+                  alt={`${brand} ${model}`}
+                  className="w-full h-40 object-cover"
+                  onError={() => setCarImage("")}
+                />
+              )}
+            </div>
+          )}
 
           {/* КПП */}
           <div>

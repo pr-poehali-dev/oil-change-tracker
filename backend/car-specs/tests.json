@@ -61,6 +61,13 @@
       "path": "/",
       "body": { "mode": "sts_photo", "image": "" },
       "expectedStatus": 400
+    },
+    {
+      "name": "Фото авто Toyota Camry",
+      "method": "POST",
+      "path": "/",
+      "body": { "mode": "car_image", "brand": "Toyota", "model": "Camry", "year": "2015" },
+      "expectedStatus": 200
     }
   ]
 }

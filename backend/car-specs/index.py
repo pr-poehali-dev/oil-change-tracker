@@ -47,6 +47,14 @@ def handler(event: dict, context) -> dict:
         print(f"STS photo decode -> {result.get('brand')} {result.get('model')} {result.get('year')} valid={result.get('valid')}")
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps(result, ensure_ascii=False)}
 
+    if mode == 'car_image':
+        if not brand or not model:
+            return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'image': ''}, ensure_ascii=False)}
+        generation = body.get('generation', '').strip()
+        image_url = _find_car_image(brand, model, generation, year)
+        print(f"Car image: {brand} {model} {generation} {year} -> {image_url[:80] if image_url else 'none'}")
+        return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'image': image_url}, ensure_ascii=False)}
+
     if not brand or not model or not year:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
@@ -795,6 +803,56 @@ def _wiki_api(lang: str, params: dict) -> dict:
     req = urllib.request.Request(f"{base}?{qs}", headers={'User-Agent': 'CarSpecsBot/1.0'})
     with urllib.request.urlopen(req, timeout=8) as resp:
         return json.loads(resp.read().decode('utf-8'))
+
+
+def _find_car_image(brand: str, model: str, generation: str = '', year: str = '') -> str:
+    """Ищет фото авто через Wikipedia (главное изображение страницы)."""
+    b = brand.strip()
+    m = model.strip()
+    g = re.sub(r'\s*(поколение|рестайлинг|series)\s*', '', generation, flags=re.IGNORECASE).strip()
+
+    queries = []
+    if g:
+        queries.append(f"{b} {m} {g}")
+    queries.append(f"{b} {m}")
+
+    for lang in ['en', 'ru']:
+        for q in queries:
+            try:
+                # Ищем подходящую страницу
+                search = _wiki_api(lang, {'action': 'query', 'list': 'search',
+                                           'srsearch': q, 'srlimit': '3', 'srnamespace': '0'})
+                hits = search.get('query', {}).get('search', [])
+                for hit in hits:
+                    title = hit.get('title', '')
+                    if not title:
+                        continue
+                    img = _wiki_page_image(lang, title)
+                    if img:
+                        return img
+            except Exception as e:
+                print(f"Car image search failed {lang} {q}: {e}")
+                continue
+    return ''
+
+
+def _wiki_page_image(lang: str, title: str) -> str:
+    """Возвращает URL главного изображения страницы Wikipedia."""
+    try:
+        data = _wiki_api(lang, {'action': 'query', 'prop': 'pageimages',
+                                 'piprop': 'original|thumbnail', 'pithumbsize': '800',
+                                 'titles': title})
+        pages = data.get('query', {}).get('pages', {})
+        for p in pages.values():
+            original = (p.get('original') or {}).get('source')
+            if original:
+                return original
+            thumb = (p.get('thumbnail') or {}).get('source')
+            if thumb:
+                return thumb
+    except Exception as e:
+        print(f"Wiki page image failed {title}: {e}")
+    return ''
 
 
 def _wiki_get_sections(lang: str, title: str) -> list:
