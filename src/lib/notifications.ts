@@ -78,12 +78,19 @@ export async function scheduleOilNotifications(remaining: number, carName: strin
   // Web-браузер
   if (!isNative()) {
     if (!isWebNotifSupported() || Notification.permission !== 'granted') return;
+    // Показываем не чаще одного раза в день на конкретное авто,
+    // чтобы уведомления не спамили при каждом заходе.
+    const today = new Date().toISOString().split('T')[0];
+    const dayKey = `web_oil_notif_${carName}`;
+    if (localStorage.getItem(dayKey) === today) return;
     if (remaining <= 0) {
       const msgs = getOverdueMessages(carName);
       await sendWebNotification(msgs[0].title, msgs[0].body, 'oil_overdue');
+      localStorage.setItem(dayKey, today);
     } else if (remaining <= 300) {
       const msgs = getWarningMessages(remaining, carName);
       await sendWebNotification(msgs[0].title, msgs[0].body, 'oil_warning');
+      localStorage.setItem(dayKey, today);
     }
     return;
   }
@@ -159,4 +166,16 @@ export async function cancelOilNotifications() {
 export function getScheduledRemaining(): number | null {
   const v = localStorage.getItem(STORAGE_KEY);
   return v !== null ? Number(v) : null;
+}
+
+// Тестовое уведомление — чтобы пользователь проверил, что всё работает
+export async function sendTestNotification(): Promise<boolean> {
+  const granted = await requestWebNotifPermission();
+  if (!granted) return false;
+  await sendWebNotification(
+    'АвтоПилот',
+    'Уведомления работают! Мы напомним о замене масла вовремя.',
+    'test'
+  );
+  return true;
 }

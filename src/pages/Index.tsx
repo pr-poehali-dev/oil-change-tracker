@@ -24,6 +24,18 @@ function loadSelectedCarId(): string {
 
 // ─── Date helpers ─────────────────────────────────────────────────
 function getTodayStr() { return new Date().toISOString().split("T")[0]; }
+function addDaysStr(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+function daysBetween(fromStr: string, toStr: string): number {
+  const a = new Date(fromStr + "T00:00:00").getTime();
+  const b = new Date(toStr + "T00:00:00").getTime();
+  return Math.round((b - a) / (24 * 60 * 60 * 1000));
+}
+function autoKmKey(carId: string) { return `auto_daily_km_${carId}`; }
+function autoKmLastKey(carId: string) { return `auto_km_last_${carId}`; }
 function formatDate(str: string) {
   return new Date(str + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
@@ -53,10 +65,7 @@ export default function Index() {
   const OIL_INTERVAL = car?.oilInterval ?? 0;
 
   const [tab, setTab] = useState<"counter" | "calendar" | "instructions" | "consumables">("counter");
-  const [autoDailyKm, setAutoDailyKm] = useState<number>(() => {
-    const v = localStorage.getItem("auto_daily_km");
-    return v ? parseFloat(v) : 0;
-  });
+  const [autoDailyKm, setAutoDailyKm] = useState<number>(0);
   const [showAutoKmModal, setShowAutoKmModal] = useState(false);
   const [autoKmInput, setAutoKmInput] = useState("");
   const [dailyInput, setDailyInput] = useState("");
@@ -99,6 +108,14 @@ export default function Index() {
     setActiveGuide(null);
     setOpenStep(null);
     setTab("counter");
+    // Загружаем индивидуальный автопробег этого авто (с миграцией старого глобального)
+    const perCar = localStorage.getItem(autoKmKey(selectedCarId));
+    if (perCar !== null) {
+      setAutoDailyKm(parseFloat(perCar) || 0);
+    } else {
+      const legacy = localStorage.getItem("auto_daily_km");
+      setAutoDailyKm(legacy ? parseFloat(legacy) || 0 : 0);
+    }
     loadEntriesForCar(selectedCarId);
     // Автозагрузка инструкций если пусто
     const selectedCar = customCars.find(c => c.id === selectedCarId);
@@ -107,24 +124,45 @@ export default function Index() {
     }
   }, [selectedCarId, carsLoaded, loadEntriesForCar]);
 
-  // Автопробег: записывать N км каждый день
+  // Автопробег: досчитываем км за КАЖДЫЙ пропущенный день с последнего визита.
+  // Это даёт эффект "начисления без открытия приложения" — при заходе
+  // добираются все дни, что прошли, пока приложение было закрыто.
   useEffect(() => {
     if (!autoDailyKm || autoDailyKm <= 0 || !car) return;
-    const lastKey = `auto_km_last_${car.id}`;
-    const today = getTodayStr();
-    const last = localStorage.getItem(lastKey);
-    if (last === today) return;
-    // уже загружены entries?
     if (!carsLoaded) return;
-    const existing = entries.find((e) => e.date === today);
-    const newKm = existing ? +(existing.km + autoDailyKm).toFixed(1) : autoDailyKm;
-    const newEntries = existing
-      ? entries.map((e) => e.date === today ? { ...e, km: newKm } : e)
-      : [...entries, { date: today, km: autoDailyKm }];
-    const newTotal = +(entries.reduce((s, e) => s + e.km, 0) - (existing?.km ?? 0) + newKm).toFixed(1);
+    const lastKey = autoKmLastKey(car.id);
+    const today = getTodayStr();
+    const lastApplied = localStorage.getItem(lastKey);
+    if (lastApplied === today) return;
+
+    // Список дней, за которые нужно начислить пробег
+    let daysToFill: string[];
+    if (!lastApplied) {
+      // Первый запуск для этого авто — начисляем только сегодня
+      daysToFill = [today];
+    } else {
+      const gap = daysBetween(lastApplied, today);
+      if (gap <= 0) return;
+      // Ограничим 60 днями, чтобы не начислить абсурдные цифры после долгого отсутствия
+      const cappedGap = Math.min(gap, 60);
+      daysToFill = [];
+      for (let i = 1; i <= cappedGap; i++) {
+        daysToFill.push(addDaysStr(lastApplied, i));
+      }
+    }
+
+    const byDate = new Map(entries.map((e) => [e.date, e.km]));
+    for (const d of daysToFill) {
+      const prevKm = byDate.get(d) ?? 0;
+      const km = +(prevKm + autoDailyKm).toFixed(1);
+      byDate.set(d, km);
+      apiSaveEntry(car.id, d, km).catch(() => {});
+    }
+
+    const newEntries: DayEntry[] = Array.from(byDate, ([date, km]) => ({ date, km }));
+    const newTotal = +newEntries.reduce((s, e) => s + e.km, 0).toFixed(1);
     setEntries(newEntries);
     setTotalKm(newTotal);
-    apiSaveEntry(car.id, today, newKm).catch(() => {});
     localStorage.setItem(lastKey, today);
   }, [autoDailyKm, car, carsLoaded, entries]);
 
@@ -909,7 +947,7 @@ export default function Index() {
             </div>
             <p className="font-golos font-bold text-foreground text-base mb-1">Автоматический пробег</p>
             <p className="text-sm text-muted-foreground font-golos leading-relaxed mb-5">
-              Каждый день при открытии приложения будет автоматически добавляться указанное количество километров.
+              {car ? `Для ${car.brand} ${car.model}: ` : ""}каждый день будет добавляться указанный пробег. Даже если вы не заходили несколько дней — при открытии километры добавятся за все пропущенные дни.
             </p>
             <div className="flex gap-2 items-center mb-5">
               <input
@@ -932,7 +970,7 @@ export default function Index() {
                 <button
                   onClick={() => {
                     setAutoDailyKm(0);
-                    localStorage.removeItem("auto_daily_km");
+                    if (car) localStorage.setItem(autoKmKey(car.id), "0");
                     setShowAutoKmModal(false);
                     showNotif("Автопробег отключён");
                   }}
@@ -944,9 +982,9 @@ export default function Index() {
               <button
                 onClick={() => {
                   const val = parseFloat(autoKmInput);
-                  if (!val || val <= 0) return;
+                  if (!val || val <= 0 || !car) return;
                   setAutoDailyKm(val);
-                  localStorage.setItem("auto_daily_km", String(val));
+                  localStorage.setItem(autoKmKey(car.id), String(val));
                   setShowAutoKmModal(false);
                   showNotif(`Автопробег: ${val} км/день включён`);
                 }}

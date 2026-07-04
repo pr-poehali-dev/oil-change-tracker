@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { AuthContext } from "@/lib/auth";
+import { requestWebNotifPermission, getWebNotifPermission, sendTestNotification } from "@/lib/notifications";
 
 
 function getTheme(): "light" | "dark" {
@@ -22,6 +23,21 @@ export default function Settings() {
   const { user, logout } = useContext(AuthContext);
   const [theme, setTheme] = useState<"light" | "dark">(getTheme);
   const [circlesLayout, setCirclesLayout] = useState<"horizontal" | "vertical">(getCirclesLayout);
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | null>(getWebNotifPermission());
+  const [notifMsg, setNotifMsg] = useState("");
+
+  async function handleEnableNotif() {
+    const ok = await sendTestNotification();
+    setNotifPerm(getWebNotifPermission());
+    if (ok) {
+      setNotifMsg("Готово! Отправили тестовое уведомление.");
+    } else if (getWebNotifPermission() === "denied") {
+      setNotifMsg("Уведомления запрещены в браузере. Разрешите их в настройках сайта.");
+    } else {
+      setNotifMsg("Ваш браузер не поддерживает уведомления.");
+    }
+    setTimeout(() => setNotifMsg(""), 4000);
+  }
 
   useEffect(() => {
     applyTheme(theme);
@@ -86,6 +102,42 @@ export default function Settings() {
               <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${circlesLayout === "vertical" ? "translate-x-5" : "translate-x-0"}`} />
             </button>
           </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
+                <Icon name="Bell" size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Уведомления о замене масла</p>
+                <p className="text-xs text-muted-foreground">
+                  {notifPerm === "granted" ? "Включены" : notifPerm === "denied" ? "Запрещены в браузере" : "Напомним, когда подойдёт срок"}
+                </p>
+              </div>
+            </div>
+            {notifPerm === "granted" ? (
+              <button
+                onClick={handleEnableNotif}
+                className="px-3 py-2 rounded-xl bg-secondary text-foreground text-xs font-golos font-medium hover:bg-muted active:scale-95 transition-all"
+              >
+                Проверить
+              </button>
+            ) : (
+              <button
+                onClick={handleEnableNotif}
+                className="px-3 py-2 rounded-xl bg-foreground text-background text-xs font-golos font-semibold hover:opacity-85 active:scale-95 transition-all"
+              >
+                Включить
+              </button>
+            )}
+          </div>
+          {notifMsg && (
+            <div className="px-5 pb-4 -mt-1">
+              <p className="text-xs text-muted-foreground font-golos">{notifMsg}</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-card border border-border rounded-2xl overflow-hidden">

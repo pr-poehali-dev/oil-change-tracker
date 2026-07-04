@@ -1,26 +1,43 @@
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+// АвтоПилот Service Worker — уведомления о замене масла
 
-self.addEventListener('push', (e) => {
-  if (!e.data) return;
-  const data = e.data.json();
-  e.waitUntil(
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+// Push-уведомления (если позже подключим серверный push)
+self.addEventListener('push', (event) => {
+  let data = { title: 'АвтоПилот', body: 'Напоминание об обслуживании' };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch (e) {
+    if (event.data) data.body = event.data.text();
+  }
+  event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: '/favicon.svg',
       badge: '/favicon.svg',
       tag: data.tag || 'autopilot',
       renotify: true,
+      data: { url: data.url || '/' },
     })
   );
 });
 
-self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clients) => {
-      if (clients.length) return clients[0].focus();
-      return self.clients.openWindow('/');
+// Клик по уведомлению — открываем/фокусируем приложение
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })
   );
 });
