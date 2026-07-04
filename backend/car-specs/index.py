@@ -68,6 +68,7 @@ def handler(event: dict, context) -> dict:
         return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'ok': saved}, ensure_ascii=False)}
 
     if not brand or not model or not year:
+        print(f"Missing required fields: mode={mode!r} brand={brand!r} model={model!r} year={year!r} body_keys={list(body.keys())}")
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'brand, model, year обязательны'})}
 
     api_key = os.environ.get('YANDEX_API_KEY', '')
