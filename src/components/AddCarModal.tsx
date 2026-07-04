@@ -437,7 +437,7 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
       setEnginesLoaded(true);
       if (stsEngine) {
         setSelectedEngine(stsEngine);
-        handleFetchSpecs(stsEngine);
+        handleFetchSpecs(stsEngine, { brand: b, model: m, year: y, generation: gen });
       }
     } catch (e: unknown) {
       setEnginesError(e instanceof Error ? e.message : "Не удалось получить данные");
@@ -446,14 +446,19 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
     }
   }
 
-  async function handleFetchSpecs(engine: Engine | null) {
+  async function handleFetchSpecs(engine: Engine | null, override?: { brand?: string; model?: string; year?: string; generation?: Generation | null }) {
     setSpecsLoading(true);
     setSpecsError("");
     setSpecsLoaded(false);
     setFromDb(false);
     setDbCarId(null);
     try {
-      const dbResult = await apiSearchCar(brand.trim(), model.trim(), year.trim());
+      // Данные авто берём из override (при скане СТС стейт ещё не обновился) или из стейта
+      const b = (override?.brand ?? brand).trim();
+      const m = (override?.model ?? model).trim();
+      const y = (override?.year ?? year).trim();
+      const gen = override && "generation" in override ? override.generation : generation;
+      const dbResult = await apiSearchCar(b, m, y);
       if (dbResult.found) {
         setFromDb(true);
         setDbCarId(dbResult.id);
@@ -463,8 +468,8 @@ export default function AddCarModal({ onAdd, onFiltersReady, onClose }: Props) {
         setSpecsLoaded(true);
         return;
       }
-      const tempId = generateCarId(brand.trim(), model.trim(), year.trim());
-      const baseBody = { brand: brand.trim(), model: model.trim(), year: year.trim(), carId: tempId, ...(generation?.name ? { generation: generation.name } : {}) };
+      const tempId = generateCarId(b, m, y);
+      const baseBody = { brand: b, model: m, year: y, carId: tempId, ...(gen?.name ? { generation: gen.name } : {}) };
       const engineName = engine?.name;
       const body = engineName ? { ...baseBody, engine: engineName } : baseBody;
       const res = await fetch(CAR_SPECS_URL, {
