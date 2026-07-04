@@ -5,7 +5,7 @@ import urllib.request
 import urllib.parse
 import psycopg2  # noqa: F401 — required, installed via requirements.txt
 from engines_db import ENGINES_DB
-from vin_decoder import decode_vin
+from vin_decoder import decode_vin, RU_BODY_CODES
 
 SCHEMA = os.environ.get('MAIN_DB_SCHEMA', 't_p21156567_oil_change_tracker')
 
@@ -1397,6 +1397,16 @@ def _recognize_sts_photo(image_b64: str) -> dict:
     if not (result['brand'] or result['vin']):
         result['valid'] = False
         result['error'] = 'Не удалось распознать данные. Сфотографируйте СТС чётче.'
+
+    # Если ИИ вместо названия модели вернул технический индекс шасси (напр. С41А23) —
+    # подставляем реальное название модели из справочника
+    model_key = result['model'].strip().upper().replace(' ', '')
+    if model_key in RU_BODY_CODES:
+        real_brand, real_model = RU_BODY_CODES[model_key]
+        print(f"STS model code mapped: {result['model']} -> {real_brand} {real_model}")
+        result['brand'] = real_brand
+        result['model'] = real_model
+
     return result
 
 
