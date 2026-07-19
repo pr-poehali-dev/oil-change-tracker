@@ -381,6 +381,7 @@ export default function Index() {
           brand: car.brand, model: car.model, year: car.year,
           carId: car.id, mode: "consumables", forceRefresh,
           ...(car.engine ? { engine: car.engine } : {}),
+          ...(car.transmission ? { transmission: car.transmission } : {}),
         }),
       });
       const data = await res.json();

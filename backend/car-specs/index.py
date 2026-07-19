@@ -14,6 +14,56 @@ def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def _fix_consumables(items: list, engine: str, transmission: str) -> list:
+    """Пост-обработка списка расходников: убираем логически неверные позиции,
+    которые иногда всё равно проскакивают в ответе ИИ.
+    - не показываем оба масла КПП (АКПП + механика) одновременно
+    - не показываем свечи зажигания для дизельных двигателей
+    - не показываем моторное масло/свечи/топливный фильтр для электромобилей
+    """
+    if not items:
+        return items
+
+    engine_low = (engine or '').lower()
+    is_diesel = 'дизел' in engine_low or 'diesel' in engine_low
+    is_electric = 'электр' in engine_low or re.search(r'\bev\b', engine_low) is not None
+
+    result = []
+    ids_seen = set()
+    for item in items:
+        item_id = (item.get('id') or '').lower()
+        name_low = (item.get('name') or '').lower()
+
+        if transmission == 'auto' and item_id == 'gear_oil':
+            continue
+        if transmission == 'manual' and item_id == 'atf':
+            continue
+
+        if is_diesel and (item_id == 'spark' or 'свеча зажигания' in name_low or 'свечи зажигания' in name_low):
+            continue
+
+        if is_electric and item_id in ('oil', 'spark', 'fuel_filter'):
+            continue
+
+        result.append(item)
+        ids_seen.add(item_id)
+
+    # Если коробка не указана и модель ответила обоими маслами КПП сразу — оставляем только первое
+    if transmission not in ('auto', 'manual') and 'atf' in ids_seen and 'gear_oil' in ids_seen:
+        seen_once = False
+        filtered = []
+        for item in result:
+            item_id = (item.get('id') or '').lower()
+            if item_id in ('atf', 'gear_oil'):
+                if seen_once:
+                    continue
+                seen_once = True
+            filtered.append(item)
+        result = filtered
+
+    return result
+
+
 def handler(event: dict, context) -> dict:
     """Подбор двигателей, масла, фильтров для автомобиля через ИИ с кешем в БД."""
     cors = {
@@ -208,14 +258,41 @@ JSON: {{"engines":[{{"id":"1","name":"M20A-FKS 2.0 бензин 171 л.с.","vol
             cached = _get_cached_consumables(car_id)
             if cached:
                 print(f"Cache hit consumables: {car_id}")
+                cached = _fix_consumables(cached, engine, transmission)
                 return {'statusCode': 200, 'headers': cors, 'body': json.dumps({'consumables': cached}, ensure_ascii=False)}
 
-        prompt = f"""Список расходников для {car}{eng}. JSON без markdown:
-{{"consumables":[{{"id":"oil","category":"Масло и фильтры","name":"Моторное масло","spec":"5W-30 SN/CF","article":"оригинал артикул","interval":"10000 км или 1 год","qty":"4.5 л","note":"допуск Toyota WS"}},{{"id":"air_filter","category":"Масло и фильтры","name":"Воздушный фильтр","spec":"","article":"17801-0H010","interval":"30000 км","qty":"1 шт","note":""}},{{"id":"cabin_filter","category":"Масло и фильтры","name":"Салонный фильтр","spec":"","article":"87139-0E040","interval":"15000 км","qty":"1 шт","note":""}},{{"id":"spark","category":"Зажигание","name":"Свечи зажигания","spec":"Иридиевые","article":"90919-01253","interval":"60000 км","qty":"4 шт","note":""}},{{"id":"brake_fluid","category":"Тормозная система","name":"Тормозная жидкость","spec":"DOT 4","article":"","interval":"2 года","qty":"0.5 л","note":""}},{{"id":"coolant","category":"Охлаждение","name":"Антифриз","spec":"LLC красный","article":"","interval":"5 лет","qty":"7 л","note":""}}]}}
-Категории: Масло и фильтры, Зажигание, Тормозная система, Охлаждение, Трансмиссия, Подвеска. Реальные OEM артикулы для {car}. 10-15 позиций."""
+        engine_low = engine.lower()
+        is_diesel = 'дизел' in engine_low or 'diesel' in engine_low
+        is_electric = 'электр' in engine_low or 'ev' in engine_low.split()
+
+        if transmission == 'auto':
+            trans_line = 'Коробка АКПП (автомат) — если есть трансмиссионное масло, укажи "Масло АКПП" (id "atf"). НЕ указывай "Масло КПП" (id "gear_oil").'
+        elif transmission == 'manual':
+            trans_line = 'Коробка МКПП (механика) — если есть трансмиссионное масло, укажи "Масло КПП" (id "gear_oil"). НЕ указывай "Масло АКПП" (id "atf").'
+        else:
+            trans_line = 'Тип коробки не указан — укажи ТОЛЬКО ОДНУ позицию трансмиссионного масла (atf либо gear_oil), в зависимости от того, что чаще ставится на эту модель.'
+
+        fuel_line = (
+            'Двигатель ДИЗЕЛЬНЫЙ — НЕ включай свечи зажигания (только свечи накаливания, если применимо), обрати внимание на топливный фильтр и сажевый фильтр если есть.'
+            if is_diesel else
+            'Двигатель БЕНЗИНОВЫЙ — включи свечи зажигания с указанием реального типа (иридиевые/платиновые/обычные) для этого мотора.'
+            if not is_electric else
+            'Электромобиль — НЕ включай моторное масло, свечи зажигания, топливный фильтр. Укажи актуальные для EV расходники: тормозная жидкость, охлаждающая жидкость батареи/инвертора, салонный фильтр.'
+        )
+
+        prompt = f"""Список реально нужных расходников для конкретного автомобиля {car}{eng}.
+{trans_line}
+{fuel_line}
+Включай ТОЛЬКО те позиции, которые физически существуют на этом автомобиле (например ГУР, раздатку, дифференциалы — только если они есть на этой модели/комплектации).
+Артикулы должны быть реальными оригинальными/аналоговыми номерами именно для {car}{eng}, не выдумывай случайные числа.
+
+JSON без markdown:
+{{"consumables":[{{"id":"oil","category":"Масло и фильтры","name":"Моторное масло","spec":"5W-30 SN/CF","article":"оригинал артикул","interval":"10000 км или 1 год","qty":"4.5 л","note":"допуск производителя"}},{{"id":"air_filter","category":"Масло и фильтры","name":"Воздушный фильтр","spec":"","article":"17801-0H010","interval":"30000 км","qty":"1 шт","note":""}},{{"id":"cabin_filter","category":"Масло и фильтры","name":"Салонный фильтр","spec":"","article":"87139-0E040","interval":"15000 км","qty":"1 шт","note":""}},{{"id":"spark","category":"Зажигание","name":"Свечи зажигания","spec":"Иридиевые","article":"90919-01253","interval":"60000 км","qty":"4 шт","note":""}},{{"id":"brake_fluid","category":"Тормозная система","name":"Тормозная жидкость","spec":"DOT 4","article":"","interval":"2 года","qty":"0.5 л","note":""}},{{"id":"coolant","category":"Охлаждение","name":"Антифриз","spec":"LLC красный","article":"","interval":"5 лет","qty":"7 л","note":""}}]}}
+Категории: Масло и фильтры, Зажигание, Тормозная система, Охлаждение, Трансмиссия, Подвеска. 8-15 позиций, только актуальные для этого авто."""
 
         result = _call_ai(api_key, prompt, max_tokens=2000, use_openai=use_openai)
         consumables = result.get('consumables', [])
+        consumables = _fix_consumables(consumables, engine, transmission)
 
         if car_id and consumables:
             _save_cached_consumables(car_id, consumables)
